@@ -23,14 +23,15 @@ def categorical(Y):
 YT = categorical(YT)
 Yt = categorical(Yt)
 
-#XT = XT[:10000]; Xt = Xt[:1000]
-#YT = YT[:10000]; Yt = Yt[:1000]
+#XT = XT[:6000]; Xt = Xt[:1000]
+#YT = YT[:6000]; Yt = Yt[:1000]
 
 bsiz = 500
 
 ## Network Definition
 
 import core
+np.random.seed(0)
 
 #from scipy.io import loadmat
 #V = loadmat('../V.mat')['V'].reshape((7,7,49))[:,:,:25].transpose(1,0,2).astype(prec)
@@ -57,6 +58,9 @@ def forward(X):
 
 import time
 
+if prec=='float32': from scipy.linalg.blas import ssyrk as rkupdate
+else:               from scipy.linalg.blas import dsyrk as rkupdate
+
 for i in xrange(0, XT.shape[0], bsiz):
 	
 	print 'Processing Training Stack ' + str(int(i/bsiz)+1) + '/' + str(XT.shape[0]/bsiz),
@@ -72,8 +76,11 @@ for i in xrange(0, XT.shape[0], bsiz):
 		if i==0: ZT = (Z,)
 		else:    ZT = ZT + (Z,)
 	
-	if i==0: SII  = np.dot(Z.T, Z)
-	else:    SII += np.dot(Z.T, Z)
+	#if i==0: SII  = np.dot(Z.T, Z)
+	#else:    SII += np.dot(Z.T, Z)
+
+	if i==0: SII = np.zeros((Z.shape[1],)*2, dtype=prec, order='F')
+	rkupdate(alpha=1.0, a=Z, trans=1, beta=1.0, c=SII, overwrite_c=1)
 	
 	if i==0: SIO  = np.dot(Z.T, Y)
 	else:    SIO += np.dot(Z.T, Y)
