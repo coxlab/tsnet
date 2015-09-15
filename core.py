@@ -16,19 +16,22 @@ def pad(X, p):
 	return np.pad(X, zip(p[0::2], p[1::2]), 'constant')
 
 #@profile
-def convolution(X, Z, W, s=None):
+def convolution(X, Z, W, B=None, s=None):
 
 	X = view_as_windows(X, (1,)+W.shape[1:])                .squeeze((1, 4))
 	Z = view_as_windows(Z, (1,)+W.shape[1:]+(1,)*(Z.ndim-4)).squeeze((Z.ndim,) + tuple(range(Z.ndim+4, Z.ndim*2)))
 
-	if s:
+	if s is not None:
 		X = X[:,:,::s[0],::s[1]]
 		Z = Z[:,:,::s[0],::s[1]]
 
 	X = np.tensordot(X, W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
 	Z = np.repeat(Z, X.shape[1], 1)
 
-	return X, Z #.reshape(Z.shape[:4] + (-1,))
+	if B is not None:
+		X = X + B.reshape(1,-1,1,1)
+
+	return X, Z #.reshape(Z.shape[:4] + (-1,)) #[...,::4]
 
 #@profile
 def maxpooling(X, Z, w, s=None):
@@ -36,7 +39,7 @@ def maxpooling(X, Z, w, s=None):
 	X = view_as_windows(X, (1,1)+tuple(w))                .squeeze((4,5))
 	Z = view_as_windows(Z, (1,1)+tuple(w)+(1,)*(Z.ndim-4)).squeeze((Z.ndim, Z.ndim+1) + tuple(range(Z.ndim+4, Z.ndim*2)))
 
-	if s:
+	if s is not None:
 		X = X[:,:,::s[0],::s[1]]
 		Z = Z[:,:,::s[0],::s[1]]
 
