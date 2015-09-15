@@ -5,8 +5,8 @@ from scipy.linalg import solve
 
 ## Load Dataset & Network
 
-from mnist_refnet import XT, YT, Xt, Yt, forward
-#from mnist_deepnet import XT, YT, Xt, Yt, forward
+#from task.mnist_refnet import XT, YT, Xt, Yt, forward
+from task.mnist_deepnet import XT, YT, Xt, Yt, forward
 
 #XT = XT[:500]; Xt = Xt[:500]
 #YT = YT[:500]; Yt = Yt[:500]

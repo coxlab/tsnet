@@ -4,7 +4,7 @@ import numpy as np
 import cPickle
 
 #https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
-(XT, YT), (Xt, Yt) = cPickle.load(open('mnist.pkl', 'rb'))
+(XT, YT), (Xt, Yt) = cPickle.load(open('task/mnist.pkl', 'rb'))
 
 XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') #/ 255
 Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') #/ 255
@@ -44,13 +44,13 @@ B = None
 #W = np.random.randn(55, 1, 7, 7).astype('float32')
 #B = None
 
-import core
+from core.lib import *
 
 def forward(X):
 	
-	X    = core.pad(X, [0,0,0,0,3,3,3,3])
-	X, Z = core.convolution(X, X, W, B)
-	X, Z = core.maxpooling(X, Z, [7,7], [7,7])
+	X    = pad(X, [0,0,0,0,3,3,3,3])
+	X, Z = convolution(X, X, W, B)
+	X, Z = maxpooling(X, Z, [7,7], [7,7])
 	
 	Z = np.tensordot(Z, V, [(5,6),(0,1)])
 	
