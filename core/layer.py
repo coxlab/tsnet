@@ -1,6 +1,7 @@
 import numpy as np
 from skimage.util.shape import view_as_windows
 from numpy.lib.stride_tricks import as_strided
+import numexpr as ne
 
 # X: img, ch, y, x
 # Z: img, ch, y, x, (...)
@@ -68,3 +69,19 @@ def relu(X, Z):
 
 	return X, Z
 
+#@profile
+def dropout(X, Z, r):
+
+	IX = np.random.rand(*X.shape) < r
+	IZ = IX_2_IZ(IX, Z.shape)
+
+	X = ne.evaluate('where(IX, 0, X/(1-r))')
+	Z = ne.evaluate('where(IZ, 0, Z/(1-r))')
+
+	#np.place(X, IX, 0)
+	#np.place(Z, IZ, 0)
+
+	#X *= 1/(1-r)
+	#Z *= 1/(1-r)
+
+	return X, Z

@@ -1,10 +1,10 @@
-## Dataset
+## Define Dataset
 
 import numpy as np
 import cPickle
 
 #https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
-(XT, YT), (Xt, Yt) = cPickle.load(open('task/mnist.pkl', 'rb'))
+(XT, YT), (Xt, Yt) = cPickle.load(open('experiment/mnist.pkl', 'rb'))
 
 XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') #/ 255
 Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') #/ 255
@@ -22,13 +22,13 @@ def categorical(Y):
 YT = categorical(YT)
 Yt = categorical(Yt)
 
-## Dataset
+## Define Network
 
-np.random.seed(0)
 from scipy.io import loadmat
 
 V = loadmat('../V.mat')['V'].reshape((7,7,49))[:,:,:25].transpose(1,0,2).astype('float32')
-P = loadmat('../W.mat')['W'].reshape((55,1,25)).astype('float32')
+#P = loadmat('../W.mat')['W'].reshape((55,1,25)).astype('float32')
+P = np.random.randn(200, 1, 25).astype('float32')
 W = np.tensordot(P, V, [(2,),(2,)])
 B = None
 
@@ -44,14 +44,16 @@ B = None
 #W = np.random.randn(55, 1, 7, 7).astype('float32')
 #B = None
 
-from core.lib import *
+from core.layer import *
 
-def forward(X):
+#@profile
+def forward(X, training=False):
 	
 	X    = pad(X, [0,0,0,0,3,3,3,3])
 	X, Z = convolution(X, X, W, B)
 	X, Z = maxpooling(X, Z, [7,7], [7,7])
-	
+	#X, Z = dropout(X, Z, 0.5) if training else (X, Z)
+
 	Z = np.tensordot(Z, V, [(5,6),(0,1)])
 	
 	Z = Z.reshape((Z.shape[0], -1)) / 255
