@@ -1,5 +1,7 @@
 .*
 *.pyc
+*.pyo
 *.pkl
 *.mat
+*prof
 !.gitignore
