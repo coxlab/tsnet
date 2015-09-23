@@ -13,7 +13,23 @@ def update(Z, Y, SII, SIO):
 
 	return SII, SIO
 
-def solve(SII, SIO, lm=False):
+def triu_2_tril(X):
 
-	_, W, _ = sposv(SII, SIO, overwrite_a=lm, overwrite_b=lm)
+	for i in xrange(1, X.shape[0]): X[i:,i-1] = X[i-1,i:]
+
+#@profile
+def solve(SII, SIO, rd):
+	
+	DI = np.diag_indices_from(SII)
+
+	SII[DI] += rd
+
+	D = SII[DI]
+	triu_2_tril(SII)
+
+	_, W, _ = sposv(SII, SIO, overwrite_a=True, overwrite_b=False, lower=1)
+
+	SII[DI] = D
+	#triu_2_tril(SII.T)
+
 	return W

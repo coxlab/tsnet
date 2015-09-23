@@ -27,8 +27,8 @@ Yt = categorical(Yt)
 from scipy.io import loadmat
 
 V = loadmat('../V.mat')['V'].astype('float32').reshape( 7,7,49)[:,:,:25].transpose(1,0,2)
-P = loadmat('../W.mat')['W'].astype('float32').reshape(55,1,25)
-#P = np.random.randn(300, 1, 25).astype('float32')
+#P = loadmat('../W.mat')['W'].astype('float32').reshape(55,1,25)
+P = np.random.randn(200, 1, 25).astype('float32')
 W = np.tensordot(P, V, [(2,),(2,)])
 B = None
 

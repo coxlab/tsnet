@@ -1,9 +1,6 @@
 import sys, time
 import numpy as np; np.random.seed(0)
 
-lm_mode = False
-tp_path = '/media/SSD/s2net/'
-
 ## Load Dataset & Network
 
 from experiment.mnist_refnet import XT, YT, Xt, Yt, forward
@@ -17,7 +14,7 @@ def aug(X): return rand_scl(rand_rot(X, 10), 0.05)
 
 bsiz      = 50
 bias_term = True
-num_epoch = 1
+num_epoch = 10
 R         = [10**2.0,10**2.5,10**3.0,10**3.5,10**4.0]
 
 ## Setup
@@ -82,18 +79,16 @@ for n in xrange(num_epoch):
 		SII, SIO = proc_epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
 from core.regression import solve
-if lm_mode: from tool.caching import save
 
 for r in xrange(len(R)):
 
 	print 'Solving Ridge Regression (r=%e)' % R[r]
 
-	if r == 0: SII[np.diag_indices_from(SII)] += R[r]
-	else:      SII[np.diag_indices_from(SII)] += R[r]-R[r-1]
+	if r == 0: rd = R[r]
+	else:      rd = R[r]-R[r-1]
 	
-	if lm_mode: save(SII, tp_path+'SII'); save(SIO, tp_path+'SIO');
-	WZ = solve(SII, SIO, lm_mode)
-	#if lm_mode: SII, SIO = hickle.load(open(tp_file,'r'))
+	WZ = solve(SII, SIO, rd)
+	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
 	#print 'Training Error = %d' % proc_epoch(XT, YT, WZ=WZ)
 	print 'Test Error = %d'     % proc_epoch(Xt, Yt, WZ=WZ)
