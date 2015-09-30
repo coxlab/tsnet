@@ -3,23 +3,24 @@ import numpy as np; np.random.seed(0)
 
 ## Load Dataset & Network
 
-from experiment.mnist_refnet import XT, YT, Xt, Yt, forward
-#from experiment.mnist_deepnet import XT, YT, Xt, Yt, forward
+from experiments.mnist_refnet import XT, YT, Xt, Yt, ssnet; net = ssnet()
+#from experiments.mnist_deepnet import XT, YT, Xt, Yt, forward
 
 from tool.augmentation import *
-def aug(X): return rand_scl(rand_rot(X, 10), 0.05)
+#def aug(X): return rand_scl(rand_rot(X, 10), 0.05)
+def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
 
 #XT = XT[:100]; Xt = Xt[:100]
 #YT = YT[:100]; Yt = Yt[:100]
 
 bsiz      = 50
 bias_term = True
-num_epoch = 10
+num_epoch = 1
 R         = [10**2.0,10**2.5,10**3.0,10**3.5,10**4.0]
 
 ## Setup
 
-from core.regression import update
+from core.learning import ridge_update
 
 #@profile
 def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
@@ -34,7 +35,7 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 			Xb = X[i:i+bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
 
-			Zb = forward(Xb)
+			Zb = net.forward(Xb)
 			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 
 			if Y is None: # Feature Extraction Mode
@@ -46,7 +47,7 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 
 			if WZ is None: # Training Mode
 
-				SII, SIO = update(Zb, Yb, SII, SIO)
+				SII, SIO = ridge_update(Zb, Yb, SII, SIO)
 			
 			else: # Test Mode
 
@@ -61,6 +62,14 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 	sys.stdout.write("\033[K")
 	#print '\n',
 	return tuple([e for e in [Z, SII, SIO, err] if e is not None])
+
+## Pre-train
+
+from core.learning import ridge_solve
+
+SII, SIO = proc_epoch(XT[:10000], YT[:10000], SII=None, SIO=None)
+WZ = ridge_solve(SII, SIO, 1000)
+net.update(WZ[:-1] if bias_term else WZ)
 
 ## Run
 
@@ -78,7 +87,7 @@ for n in xrange(num_epoch):
 		YT = YT[po]
 		SII, SIO = proc_epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
-from core.regression import solve
+#from core.learning import ridge_solve
 
 for r in xrange(len(R)):
 
@@ -87,7 +96,7 @@ for r in xrange(len(R)):
 	if r == 0: rd = R[r]
 	else:      rd = R[r]-R[r-1]
 	
-	WZ = solve(SII, SIO, rd)
+	WZ = ridge_solve(SII, SIO, rd)
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
 	#print 'Training Error = %d' % proc_epoch(XT, YT, WZ=WZ)

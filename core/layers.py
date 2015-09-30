@@ -27,6 +27,7 @@ def convolution(X, Z, W, B=None, s=None):
 		Z = Z[:,:,::s[0],::s[1]]
 
 	X = np.tensordot(X, W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
+	Z = Z.transpose(range(4) + range(Z.ndim-3, Z.ndim) + range(4, Z.ndim-3))
 	Z = np.repeat(Z, X.shape[1], 1)
 
 	if B is not None:
