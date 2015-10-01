@@ -3,7 +3,7 @@ import numpy as np; np.random.seed(0)
 
 ## Load Dataset & Network
 
-from experiments.mnist_refnet import XT, YT, Xt, Yt, ssnet; net = ssnet()
+from experiments.mnist_refnet import XT, YT, Xt, Yt, net
 #from experiments.mnist_deepnet import XT, YT, Xt, Yt, forward
 
 from tool.augmentation import *
@@ -20,7 +20,8 @@ R         = [10**2.0,10**2.5,10**3.0,10**3.5,10**4.0]
 
 ## Setup
 
-from core.learning import ridge_update
+from core.network import *
+from core.classifier import *
 
 #@profile
 def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
@@ -35,24 +36,24 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 			Xb = X[i:i+bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
 
-			Zb = net.forward(Xb)
+			Zb = forward(net, Xb); Zb = Zb.reshape(Zb.shape[0], -1)
 			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 
-			if Y is None: # Feature Extraction Mode
-
-				Z = (Zb,) if Z is None else Z + (Zb,)
-				continue
+			#if Y is None: # Feature Extraction Mode
+			#	Z = (Zb,) if Z is None else Z + (Zb,)
+			#	continue
 
 			Yb = Y[i:i+bsiz]
 
 			if WZ is None: # Training Mode
 
-				SII, SIO = ridge_update(Zb, Yb, SII, SIO)
+				SII, SIO = update(Zb, Yb, SII, SIO)
 			
 			else: # Test Mode
 
-				if i==0: err = 0
-				Yp = np.dot(Zb, WZ)
+				Yp = infer(Zb, WZ)
+
+				err  = 0 if i == 0 else err 
 				err += np.count_nonzero(np.argmax(Yp,1) - np.argmax(Yb,1))
 
 			toc = time.time()
@@ -65,13 +66,15 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 
 ## Pre-train
 
-from core.learning import ridge_solve
+# WZ = WZ.reshape(self.Zs + (-1,))
+# WZ = np.rollaxis(WZ, WZ.ndim-1)
+# filter_update(WZ, self.W)
 
-SII, SIO = proc_epoch(XT[:10000], YT[:10000], SII=None, SIO=None)
-WZ = ridge_solve(SII, SIO, 1000)
-net.update(WZ[:-1] if bias_term else WZ)
+#SII, SIO = proc_epoch(XT[:10000], YT[:10000], SII=None, SIO=None)
+#WZ = ridge_solve(SII, SIO, 1000)
+#net.update(WZ[:-1] if bias_term else WZ)
 
-## Run
+## Train and Test
 
 SII, SIO = (None,)*2
 
@@ -87,8 +90,6 @@ for n in xrange(num_epoch):
 		YT = YT[po]
 		SII, SIO = proc_epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
-#from core.learning import ridge_solve
-
 for r in xrange(len(R)):
 
 	print 'Solving Ridge Regression (r=%e)' % R[r]
@@ -96,7 +97,7 @@ for r in xrange(len(R)):
 	if r == 0: rd = R[r]
 	else:      rd = R[r]-R[r-1]
 	
-	WZ = ridge_solve(SII, SIO, rd)
+	WZ = solve(SII, SIO, rd)
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
 	#print 'Training Error = %d' % proc_epoch(XT, YT, WZ=WZ)

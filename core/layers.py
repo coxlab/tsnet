@@ -12,14 +12,20 @@ def IX_2_IZ(IX, Zs):
 	return as_strided(IX, Zs, IX.strides + (0,)*(len(Zs)-IX.ndim))
 
 #@profile
-def pad(X, p):
+def padding(X, Z, p):
 
-	return np.pad(X, zip(p[0::2], p[1::2]), 'constant')
+	p = [0,0] * 2 + p
+	X = np.pad(X, zip(p[0::2], p[1::2]), 'constant')
+
+	p = p + [0,0] * (Z.ndim - X.ndim)
+	Z = np.pad(Z, zip(p[0::2], p[1::2]), 'constant')
+
+	return X, Z
 
 #@profile
 def convolution(X, Z, W, B=None, s=None):
 
-	X = view_as_windows(X, (1,)+W.shape[1:])                .squeeze((1, 4))
+	X = view_as_windows(X, (1,)+W.shape[1:])                .squeeze((1,4))
 	Z = view_as_windows(Z, (1,)+W.shape[1:]+(1,)*(Z.ndim-4)).squeeze((Z.ndim,) + tuple(range(Z.ndim+4, Z.ndim*2)))
 
 	if s is not None:
@@ -27,13 +33,12 @@ def convolution(X, Z, W, B=None, s=None):
 		Z = Z[:,:,::s[0],::s[1]]
 
 	X = np.tensordot(X, W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
-	Z = Z.transpose(range(4) + range(Z.ndim-3, Z.ndim) + range(4, Z.ndim-3))
-	Z = np.repeat(Z, X.shape[1], 1)
+	Z = np.repeat(Z.transpose(range(4) + range(Z.ndim-3, Z.ndim) + range(4, Z.ndim-3)), X.shape[1], 1)
 
 	if B is not None:
 		X = X + B.reshape(1,-1,1,1)
 
-	return X, Z #.reshape(Z.shape[:4] + (-1,)) #[...,::4]
+	return X, Z
 
 #@profile
 def maxpooling(X, Z, w, s=None):
@@ -57,7 +62,7 @@ def maxpooling(X, Z, w, s=None):
 	X = X[indices(X.shape[:-2]) + IX]
 	Z = Z[indices(Z.shape[:-2]) + IZ]
 	
-	return X, Z #.reshape(Z.shape[:4] + (-1,))
+	return X, Z
 
 #@profile
 def relu(X, Z):
@@ -78,11 +83,5 @@ def dropout(X, Z, r):
 
 	X = ne.evaluate('where(IX, 0, X/(1-r))')
 	Z = ne.evaluate('where(IZ, 0, Z/(1-r))')
-
-	#np.place(X, IX, 0)
-	#np.place(Z, IZ, 0)
-
-	#X *= 1/(1-r)
-	#Z *= 1/(1-r)
 
 	return X, Z
