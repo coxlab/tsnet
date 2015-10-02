@@ -3,18 +3,14 @@ import numpy as np; np.random.seed(0)
 
 ## Load Dataset & Network
 
-from experiments.mnist_refnet import XT, YT, Xt, Yt, net
-#from experiments.mnist_deepnet import XT, YT, Xt, Yt, forward
-
-from tool.augmentation import *
-#def aug(X): return rand_scl(rand_rot(X, 10), 0.05)
-def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
+exec 'from experiments.%s import XT, YT, Xt, Yt, aug, net' % sys.argv[1]
 
 #XT = XT[:100]; Xt = Xt[:100]
 #YT = YT[:100]; Yt = Yt[:100]
 
 bsiz      = 50
 bias_term = True
+prtrn_len = XT.shape[0]
 num_epoch = 1
 R         = [10**2.0,10**2.5,10**3.0,10**3.5,10**4.0]
 
@@ -23,10 +19,17 @@ R         = [10**2.0,10**2.5,10**3.0,10**3.5,10**4.0]
 from core.network import *
 from core.classifier import *
 
-#@profile
-def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
+Zs = () # TBD Runtime
+ci = [] #[i for i in xrange(len(net)) if net[i]['type'][0] == 'c']
 
-	err = None
+#@profile
+def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
+
+	global Zs
+
+	if   Y  is None: mode = 'ftext'; err = None # Not in Use
+	elif WZ is None: mode = 'train'; err = None
+	else:            mode = 'test';  err = 0
 
 	for i in xrange(0, X.shape[0], bsiz):
 
@@ -36,25 +39,15 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 			Xb = X[i:i+bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
 
-			Zb = forward(net, Xb); Zb = Zb.reshape(Zb.shape[0], -1)
+			Zb = forward(net, Xb, mode, cp)
+			Zs = Zb.shape[1:]
+			Zb = Zb.reshape(Zb.shape[0], -1)
+
 			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
-
-			#if Y is None: # Feature Extraction Mode
-			#	Z = (Zb,) if Z is None else Z + (Zb,)
-			#	continue
-
-			Yb = Y[i:i+bsiz]
-
-			if WZ is None: # Training Mode
-
-				SII, SIO = update(Zb, Yb, SII, SIO)
 			
-			else: # Test Mode
-
-				Yp = infer(Zb, WZ)
-
-				err  = 0 if i == 0 else err 
-				err += np.count_nonzero(np.argmax(Yp,1) - np.argmax(Yb,1))
+			if   mode == 'ftext': Z = (Zb,) if Z is None else Z + (Zb,); continue
+			elif mode == 'train': Yb = Y[i:i+bsiz]; SII, SIO = update(Zb, Yb, SII, SIO)
+			else:                 Yb = Y[i:i+bsiz]; err += np.count_nonzero(np.argmax(infer(Zb,WZ),1) - np.argmax(Yb,1))
 
 			toc = time.time()
 			print '(%f Seconds)\r' % (toc - tic),
@@ -66,13 +59,16 @@ def proc_epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None):
 
 ## Pre-train
 
-# WZ = WZ.reshape(self.Zs + (-1,))
-# WZ = np.rollaxis(WZ, WZ.ndim-1)
-# filter_update(WZ, self.W)
+for l in ci[::-1]: # Top-down Order
 
-#SII, SIO = proc_epoch(XT[:10000], YT[:10000], SII=None, SIO=None)
-#WZ = ridge_solve(SII, SIO, 1000)
-#net.update(WZ[:-1] if bias_term else WZ)
+	print 'Pre-training Layer %d' % (l+1)
+	WZ = solve(*epoch(XT[:prtrn_len], YT[:prtrn_len], SII=None, SIO=None, cp=[l]) + (1000,))
+	
+	WZ = WZ[:-1] if bias_term else WZ
+	WZ = WZ.reshape(Zs + (-1,)); print Zs
+	WZ = np.rollaxis(WZ, WZ.ndim-1); print WZ.shape
+	
+	pretrain(net, WZ, l)
 
 ## Train and Test
 
@@ -83,12 +79,12 @@ for n in xrange(num_epoch):
 	print 'Gathering SII/SIO (Epoch %d)' % (n+1)
 
 	if n < 1:
-		SII, SIO = proc_epoch(XT, YT, SII=SII, SIO=SIO)
+		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO)
 	else: # Data Augmentation
 		po = np.random.permutation(XT.shape[0])
 		XT = XT[po]
 		YT = YT[po]
-		SII, SIO = proc_epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
+		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
 for r in xrange(len(R)):
 
@@ -100,6 +96,6 @@ for r in xrange(len(R)):
 	WZ = solve(SII, SIO, rd)
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
-	#print 'Training Error = %d' % proc_epoch(XT, YT, WZ=WZ)
-	print 'Test Error = %d'     % proc_epoch(Xt, Yt, WZ=WZ)
+	#print 'Training Error = %d' % epoch(XT, YT, WZ=WZ)
+	print 'Test Error = %d'     % epoch(Xt, Yt, WZ=WZ)
 

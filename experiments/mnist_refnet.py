@@ -3,8 +3,7 @@
 import numpy as np
 import os, cPickle
 
-#https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
-(XT, YT), (Xt, Yt) = cPickle.load(open(os.path.dirname(__file__)+'/mnist.pkl', 'rb'))
+(XT, YT), (Xt, Yt) = cPickle.load(open(os.path.dirname(__file__)+'/mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
 
 XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') / 255
 Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') / 255
@@ -22,6 +21,10 @@ def categorical(Y):
 YT = categorical(YT)
 Yt = categorical(Yt)
 
+from tool.augmentation import *
+
+def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
+
 ## Define Network
 
 from scipy.io import loadmat
@@ -38,10 +41,12 @@ B = None
 #W = np.random.randn(55, 1, 7, 7).astype('float32')
 #B = None
 
+#W /= np.linalg.norm(W)
+
 net = []
 
-net.append(dict()); net[-1]['type']='padz';    net[-1]['p']=[3,3,3,3];
-net.append(dict()); net[-1]['type']='conv';    net[-1]['W']=W;         net[-1]['B']=B;
-net.append(dict()); net[-1]['type']='maxpool'; net[-1]['w']=[7,7];     net[-1]['s']=[7,7];
-net.append(dict()); net[-1]['type']='dimredc'; net[-1]['P']=V;
+net += [{}]; net[-1]['type'] = 'pad';     net[-1]['p'] = [3,3,3,3];
+net += [{}]; net[-1]['type'] = 'conv';    net[-1]['W'] = W;         net[-1]['B'] = B;
+net += [{}]; net[-1]['type'] = 'maxpool'; net[-1]['w'] = [7,7];     net[-1]['s'] = [7,7];
+net += [{}]; net[-1]['type'] = 'dimredc'; net[-1]['P'] = V;
 

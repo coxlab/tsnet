@@ -9,10 +9,10 @@ def forward(net, X, mode='test', cp=[]):
 
 		Z = X if l in cp + [0] else Z
 
-		if   net[l]['type'][0]  == 'c' : X, Z = convolution(X, Z, net[l]['W'], net[l].get('B'), net[l].get('s'))
-		elif net[l]['type'][0]  == 'm' : X, Z = maxpooling (X, Z, net[l]['w'],                  net[l].get('s'))
-		elif net[l]['type'][0]  == 'r' : X, Z = relu       (X, Z                                               )
-		elif net[l]['type'][0]  == 'p' : X, Z = padding    (X, Z, net[l]['p']                                  )
+		if   net[l]['type'][:1] == 'c' : X, Z = convolution(X, Z, net[l]['W'], net[l].get('B'), net[l].get('s'))
+		elif net[l]['type'][:1] == 'm' : X, Z = maxpooling (X, Z, net[l]['w'],                  net[l].get('s'))
+		elif net[l]['type'][:1] == 'r' : X, Z = relu       (X, Z                                               )
+		elif net[l]['type'][:1] == 'p' : X, Z = padding    (X, Z, net[l]['p']                                  )
 		elif net[l]['type'][:2] == 'dr': X, Z = dropout    (X, Z, net[l]['r']                                  ) if mode == 'train' else (X, Z)
 		elif net[l]['type'][:2] == 'di':    Z = dimreduct  (   Z, net[l]['P'], (range(Z.ndim-3,Z.ndim),[0,1,2]))
 
@@ -20,11 +20,23 @@ def forward(net, X, mode='test', cp=[]):
 
 	return Z
 
+def disable(net, lt):
+
+	for l in xrange(len(net)):
+
+		if net[l]['type'][:2] == lt[:2]: net[l]['disable'] = True
+
+def enable(net, lt):
+
+	for l in xrange(len(net)):
+
+		if net[l]['type'][:2] == lt[:2] and net[l].has_key('disable'): _ = net[l].pop('disable')
+
 from scipy.sparse.linalg import svds
 
 def pretrain(net, WZ, l=None):
 
-	l = np.amin([i for i in xrange(len(net)) if net[l]['type'][0] == 'c']) if l is None else l
+	l = np.amin([i for i in xrange(len(net)) if net[i]['type'][0] == 'c']) if l is None else l
 	
         # WZ: class, (...), cho, y, x, chi, wy, wx
         # W: cho, chi, wy, wx

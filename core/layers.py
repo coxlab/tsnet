@@ -29,7 +29,7 @@ def convolution(X, Z, W, B=None, s=None):
 	Z = view_as_windows(Z, (1,)+W.shape[1:]+(1,)*(Z.ndim-4)).squeeze((Z.ndim,) + tuple(range(Z.ndim+4, Z.ndim*2)))
 
 	if s is not None:
-		X = X[:,:,::s[0],::s[1]]
+		X = X[:,  ::s[0],::s[1]]
 		Z = Z[:,:,::s[0],::s[1]]
 
 	X = np.tensordot(X, W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
