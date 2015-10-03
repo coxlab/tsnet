@@ -43,6 +43,8 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 			Zs = Zb.shape[1:]
 			Zb = Zb.reshape(Zb.shape[0], -1)
 
+			print '[Dim(Z) = {0}]'.format(str(Zs)), 
+
 			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
 			if   mode == 'ftext': Z = (Zb,) if Z is None else Z + (Zb,); continue
@@ -65,8 +67,8 @@ for l in ci[::-1]: # Top-down Order
 	WZ = solve(*epoch(XT[:prtrn_len], YT[:prtrn_len], SII=None, SIO=None, cp=[l]) + (1000,))
 	
 	WZ = WZ[:-1] if bias_term else WZ
-	WZ = WZ.reshape(Zs + (-1,)); print Zs
-	WZ = np.rollaxis(WZ, WZ.ndim-1); print WZ.shape
+	WZ = WZ.reshape(Zs + (-1,))
+	WZ = np.rollaxis(WZ, WZ.ndim-1)
 	
 	pretrain(net, WZ, l)
 
