@@ -3,16 +3,18 @@ import numpy as np; np.random.seed(0)
 
 ## Load Dataset & Network
 
-exec 'from experiments.%s import XT, YT, Xt, Yt, aug, net' % sys.argv[1]
+from setting import *; settings = parser.parse_args()
+
+num_epoch = settings.epoch
+bsiz      = settings.batchsize
+bias_term = settings.biasterm
+R         = 10 ** np.array(settings.regconst)
+
+exec 'from dataset.%s import XT, YT, Xt, Yt, aug' % settings.dataset
+net = netinit(settings.network)
 
 #XT = XT[:100]; Xt = Xt[:100]
 #YT = YT[:100]; Yt = Yt[:100]
-
-bsiz      = 50
-bias_term = True
-prtrn_len = XT.shape[0]
-num_epoch = 1
-R         = [10**2.0,10**2.5,10**3.0,10**3.5,10**4.0]
 
 ## Setup
 
@@ -20,7 +22,6 @@ from core.network import *
 from core.classifier import *
 
 Zs = () # TBD Runtime
-ci = [] #[i for i in xrange(len(net)) if net[i]['type'][0] == 'c']
 
 #@profile
 def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
@@ -60,6 +61,9 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 	return tuple([e for e in [Z, SII, SIO, err] if e is not None])
 
 ## Pre-train
+
+ci = [] #[i for i in xrange(len(net)) if net[i]['type'][0] == 'c']
+prtrn_len = XT.shape[0]
 
 for l in ci[::-1]: # Top-down Order
 

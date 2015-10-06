@@ -9,12 +9,12 @@ def forward(net, X, mode='test', cp=[]):
 
 		Z = X if l in cp + [0] else Z
 
-		if   net[l]['type'][:1] == 'c' : X, Z = convolution(X, Z, net[l]['W'], net[l].get('B'), net[l].get('s'))
-		elif net[l]['type'][:1] == 'm' : X, Z = maxpooling (X, Z, net[l]['w'],                  net[l].get('s'))
-		elif net[l]['type'][:1] == 'r' : X, Z = relu       (X, Z                                               )
-		elif net[l]['type'][:1] == 'p' : X, Z = padding    (X, Z, net[l]['p']                                  )
-		elif net[l]['type'][:2] == 'dr': X, Z = dropout    (X, Z, net[l]['r']                                  ) if mode == 'train' else (X, Z)
-		elif net[l]['type'][:2] == 'di':    Z = dimreduct  (   Z, net[l]['P'], (range(Z.ndim-3,Z.ndim),[0,1,2]))
+		if   net[l][0][:1] == 'c' : X, Z = convolution(X, Z, net[l][1], net[l][2], net[l][3]            )
+		elif net[l][0][:1] == 'm' : X, Z = maxpooling (X, Z, net[l][1], net[l][2]                       )
+		elif net[l][0][:1] == 'r' : X, Z = relu       (X, Z                                             )
+		elif net[l][0][:1] == 'p' : X, Z = padding    (X, Z, net[l][1]                                  )
+		elif net[l][0][:2] == 'dr': X, Z = dropout    (X, Z, net[l][1]                                  ) if mode == 'train' else (X, Z)
+		elif net[l][0][:2] == 'di':    Z = dimreduct  (   Z, net[l][1], (range(Z.ndim-3,Z.ndim),[0,1,2]))
 
 		else: raise StandardError('Operation in Layer {0} Undefined!'.format(str(l+1)))
 

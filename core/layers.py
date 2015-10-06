@@ -1,6 +1,5 @@
 import numpy as np
 from skimage.util.shape import view_as_windows
-from numpy.lib.stride_tricks import as_strided
 import numexpr as ne
 
 # X: img, ch, y, x
@@ -48,36 +47,32 @@ def maxpooling(X, Z, w, s=None):
 		for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
 		return I
 
-	MI = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(w))
+	I = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(w))
 
-	X = X[MI]
-	Z = Z[MI]
+	X = X[I]
+	Z = Z[I]
 	
 	return X, Z
-
-def IX_2_IZ(IX, Zs):
-
-        return as_strided(IX, Zs, IX.strides + (0,)*(len(Zs)-IX.ndim))
 
 #@profile
 def relu(X, Z):
 
-	IX = X <= 0 # -> numexpr
-	IZ = IX_2_IZ(IX, Z.shape)
+	I = X <= 0
+	X = ne.evaluate('where(I, 0, X)')
 
-	np.place(X, IX, 0) # -> numexpr
-	np.place(Z, IZ, 0) # -> numexpr
+	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
+	Z = ne.evaluate('where(I, 0, Z)')
 
 	return X, Z
 
 #@profile
 def dropout(X, Z, r):
 
-	IX = np.random.rand(*X.shape) < r
-	IZ = IX_2_IZ(IX, Z.shape)
+	I = np.random.rand(*X.shape) < r
+	X = ne.evaluate('where(I, 0, X/(1-r))')
 
-	X = ne.evaluate('where(IX, 0, X/(1-r))')
-	Z = ne.evaluate('where(IZ, 0, Z/(1-r))')
+	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
+	Z = ne.evaluate('where(I, 0, Z/(1-r))')
 
 	return X, Z
 

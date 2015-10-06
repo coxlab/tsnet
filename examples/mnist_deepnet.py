@@ -37,7 +37,7 @@ from scipy.io import loadmat
 
 W1 = np.random.randn( 8, 1,7,7).astype('float32')
 B1 = None
-W2 = np.random.randn(16, 8,3,3).astype('float32')
+W2 = np.random.randn(32, 8,3,3).astype('float32')
 B2 = None
 
 net = []
