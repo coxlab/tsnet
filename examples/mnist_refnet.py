@@ -19,13 +19,8 @@ B = None
 
 net = []
 
-#net += [{}]; net[-1]['type'] = 'pad';     net[-1]['p'] = [3,3,3,3];
-#net += [{}]; net[-1]['type'] = 'conv';    net[-1]['W'] = W;         net[-1]['B'] = B;
-#net += [{}]; net[-1]['type'] = 'maxpool'; net[-1]['w'] = [7,7];     net[-1]['s'] = [7,7];
-#net += [{}]; net[-1]['type'] = 'dimredc'; net[-1]['P'] = V;
-
-net += [[]]; net[-1] += ['pad'];     net[-1] += [[3,3,3,3]];
-net += [[]]; net[-1] += ['conv'];    net[-1] += [W];         net[-1] += [B];     net[-1] += [None];
-net += [[]]; net[-1] += ['maxpool']; net[-1] += [[7,7]];     net[-1] += [[7,7]];
-net += [[]]; net[-1] += ['dimredc']; net[-1] += [V];
+net += [[]]; net[-1] += ['pad'];     net[-1] += [True]; net[-1] += [[3,3,3,3]];
+net += [[]]; net[-1] += ['conv'];    net[-1] += [True]; net[-1] += [W];         net[-1] += [B];     net[-1] += [None];
+net += [[]]; net[-1] += ['maxpool']; net[-1] += [True]; net[-1] += [[7,7]];     net[-1] += [[7,7]];
+#net += [[]]; net[-1] += ['dimredc']; net[-1] += [True]; net[-1] += [V];
 

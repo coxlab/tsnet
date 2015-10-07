@@ -14,7 +14,7 @@ def im2col(T, w):
 	return T
 
 #@profile
-def convolution(X, Z, W, B=None, s=None):
+def convolution(X, Z, W, B, s):
 
 	X = im2col(X, (1,)+W.shape[1:]).squeeze(4)
 	Z = im2col(Z, (1,)+W.shape[1:]).squeeze(4)
@@ -32,7 +32,7 @@ def convolution(X, Z, W, B=None, s=None):
 	return X, Z
 
 #@profile
-def maxpooling(X, Z, w, s=None):
+def maxpooling(X, Z, w, s):
 
 	X = im2col(X, (1,1)+tuple(w)).squeeze((4,5))
 	Z = im2col(Z, (1,1)+tuple(w)).squeeze((4,5))

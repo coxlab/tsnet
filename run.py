@@ -1,14 +1,10 @@
 import sys, time
-import numpy as np; np.random.seed(0)
+import numpy as np
 
 ## Load Dataset & Network
 
-from setting import *; settings = parser.parse_args()
-
-num_epoch = settings.epoch
-bsiz      = settings.batchsize
-bias_term = settings.biasterm
-R         = 10 ** np.array(settings.regconst)
+from setting import *
+settings = parser.parse_args(); np.random.seed(settings.rseed)
 
 exec 'from dataset.%s import XT, YT, Xt, Yt, aug' % settings.dataset
 net = netinit(settings.network)
@@ -16,12 +12,29 @@ net = netinit(settings.network)
 #XT = XT[:100]; Xt = Xt[:100]
 #YT = YT[:100]; Yt = Yt[:100]
 
-## Setup
+## Setup Parameters & Define Epoch
 
 from core.network import *
 from core.classifier import *
 
-Zs = () # TBD Runtime
+num_epoch = settings.epoch
+bsiz      = settings.batchsize
+bias_term = settings.biasterm
+
+if settings.memest:
+	
+	Ztmp = forward(net, np.zeros_like(XT[:bsiz]))
+	Zdim = np.prod(Ztmp.shape[1:]) + int(bias_term)
+
+	memusage  = XT.nbytes + YT.nbytes + Xt.nbytes + Yt.nbytes # Dataset
+	memusage += Zdim * bsiz * 4                               # Batch
+	memusage += Zdim ** 2 * 4 + Zdim * 4                      # SII + cache
+	memusage += Zdim * YT.shape[1] * 2                        # SIO + WZ
+	
+	print 'Estimated Memory Usage: {0} MB'.format(int(memusage / 1024.0**2))
+	sys.exit()
+
+Zs = ()
 
 #@profile
 def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
@@ -40,7 +53,7 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 			Xb = X[i:i+bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
 
-			Zb = forward(net, Xb, mode, cp)
+			Zb = forward(net, Xb, cp)
 			Zs = Zb.shape[1:]
 			Zb = Zb.reshape(Zb.shape[0], -1)
 
@@ -62,19 +75,31 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 
 ## Pre-train
 
-ci = [] #[i for i in xrange(len(net)) if net[i]['type'][0] == 'c']
-prtrn_len = XT.shape[0]
+if settings.pretrain is not None:
 
-for l in ci[::-1]: # Top-down Order
+	disable(net, 'di')
 
-	print 'Pre-training Layer %d' % (l+1)
-	WZ = solve(*epoch(XT[:prtrn_len], YT[:prtrn_len], SII=None, SIO=None, cp=[l]) + (1000,))
+	ci   = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c']
+	pitr = int(settings.pretrain[0])
+	plen = XT.shape[0] * settings.pretrain[1]
+	preg = 10 ** settings.pretrain[2]
+	pws  = True if settings.pretrain[3] == 1 else False
+	prat = settings.pretrain[4]
+
+	for i in xrange(pitr): # Iterations
+
+		for l in ci[::-1]: # Top-down Order
+
+			print 'Pre-training Layer %d' % (l+1)
+			WZ = solve(*epoch(XT[:plen], YT[:plen], SII=None, SIO=None, cp=[l]) + (preg,))
 	
-	WZ = WZ[:-1] if bias_term else WZ
-	WZ = WZ.reshape(Zs + (-1,))
-	WZ = np.rollaxis(WZ, WZ.ndim-1)
+			WZ = WZ[:-1] if bias_term else WZ
+			WZ = WZ.reshape(Zs + (-1,))
+			WZ = np.rollaxis(WZ, WZ.ndim-1)
 	
-	pretrain(net, WZ, l)
+			pretrain(net, WZ, l, pws, prat)
+
+	enable(net, 'di')
 
 ## Train and Test
 
@@ -92,16 +117,19 @@ for n in xrange(num_epoch):
 		YT = YT[po]
 		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
-for r in xrange(len(R)):
+disable(net, 'dr')
+reg = 10 ** np.array(settings.regconst)
 
-	print 'Solving Ridge Regression (r=%e)' % R[r]
+for r in xrange(len(reg)):
 
-	if r == 0: rd = R[r]
-	else:      rd = R[r]-R[r-1]
+	print 'Solving Ridge Regression (r=%e)' % reg[r]
+
+	if r == 0: rd = reg[r]
+	else:      rd = reg[r]-reg[r-1]
 	
 	WZ = solve(SII, SIO, rd)
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
-	#print 'Training Error = %d' % epoch(XT, YT, WZ=WZ)
-	print 'Test Error = %d'     % epoch(Xt, Yt, WZ=WZ)
+	if settings.trnerr: print 'Training Error = %d' % epoch(XT, YT, WZ=WZ)
+	print                     'Test Error = %d'     % epoch(Xt, Yt, WZ=WZ)
 
