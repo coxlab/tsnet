@@ -124,10 +124,10 @@ for r in xrange(len(reg)):
 
 	print 'Solving Ridge Regression (r=%e)' % reg[r]
 
-	if r == 0: rd = reg[r]
-	else:      rd = reg[r]-reg[r-1]
+	#if r == 0: rd = reg[r]
+	#else:      rd = reg[r]-reg[r-1]
 	
-	WZ = solve(SII, SIO, rd)
+	WZ = solve(SII, SIO, reg[r])
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
 	if settings.trnerr: print 'Training Error = %d' % epoch(XT, YT, WZ=WZ)

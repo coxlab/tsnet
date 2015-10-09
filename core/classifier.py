@@ -14,14 +14,14 @@ def update(Z, Y, SII, SIO):
 	return SII, SIO
 
 #@profile
-def solve(SII, SIO, rd):
+def solve(SII, SIO, reg):
 	
 	DI = np.diag_indices_from(SII)
-	SII[DI] += rd
 
-	D = SII[DI]
+	D  = SII[DI]
 	for i in xrange(1, SII.shape[0]): SII[i:,i-1] = SII[i-1,i:]
 
+	SII[DI] += reg
 	_, WZ, _ = sposv(SII, SIO, overwrite_a=True, overwrite_b=False, lower=1)
 	
 	SII[DI] = D

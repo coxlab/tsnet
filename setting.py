@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-rseed', type=int, default=0)
 
 parser.add_argument('-dataset', default='mnist')
-parser.add_argument('-network', default=['mnist_refnet'], nargs='*') #['p:3,3,3,3','c:55,1,7,7:0:1,1','m:7,7:7,7','di:25']
+parser.add_argument('-network', default=['mnist_refnet'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25
 
 parser.add_argument('-pretrain', type=float, nargs=5) # iter, ratio, reg, weight sharing, damping rate
 
@@ -29,7 +29,7 @@ def netinit(netspec, XT=None):
 
 		for l in xrange(len(netspec)):
 
-			ls = netspec[l].split(':')
+			ls = netspec[l].replace('/',':').split(':')
 
 			net     += [[]]
 			net[-1] += [ls[0]] # type
@@ -49,8 +49,8 @@ def netinit(netspec, XT=None):
 
 			if net[l][TYPE][:1] == 'c':
 
-				net[l][PARAM  ] = np.random.randn(*net[l][1]).astype('float32') # W
-				net[l][PARAM+1] = np.zeros(net[l][1].shape[0]).astype('float32') if net[l][2] == 1 else None # B
+				net[l][PARAM  ] = np.random.randn(*net[l][PARAM]).astype('float32') # W
+				net[l][PARAM+1] = np.zeros(net[l][PARAM].shape[0]).astype('float32') if net[l][PARAM+1] == 1 else None # B
 			
 			elif net[l][TYPE][:2] == 'di':
 
