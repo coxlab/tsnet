@@ -1,12 +1,13 @@
-import sys, time
+import math, sys, time
 import numpy as np
+import warnings; warnings.filterwarnings("ignore")
 
 ## Load Dataset & Network
 
 from setting import *
 settings = parser.parse_args(); np.random.seed(settings.rseed)
 
-exec 'from dataset.%s import XT, YT, Xt, Yt, aug' % settings.dataset
+exec 'from dataset.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
 net = netinit(settings.network)
 
 #XT = XT[:100]; Xt = Xt[:100]
@@ -18,20 +19,22 @@ from core.network import *
 from core.classifier import *
 
 num_epoch = settings.epoch
-bsiz      = settings.batchsize
+bsiz      = settings.batchsize; bsiz = float(bsiz)
 bias_term = settings.biasterm
 
-if settings.memest:
+if settings.estmem:
 	
 	Ztmp = forward(net, np.zeros_like(XT[:bsiz]))
 	Zdim = np.prod(Ztmp.shape[1:]) + int(bias_term)
 
-	memusage  = XT.nbytes + YT.nbytes + Xt.nbytes + Yt.nbytes # Dataset
-	memusage += Zdim * bsiz * 4                               # Batch
-	memusage += Zdim ** 2 * 4 + Zdim * 4                      # SII + cache
-	memusage += Zdim * YT.shape[1] * 2                        # SIO + WZ
-	
-	print 'Estimated Memory Usage: {0} MB'.format(int(memusage / 1024.0**2))
+	usage  = XT.nbytes + YT.nbytes     # Dataset
+	usage += Xv.nbytes + Yv.nbytes
+	usage += Xt.nbytes + Yt.nbytes
+	usage += Zdim * bsiz * 4           # Batch
+	usage += Zdim ** 2 * 4 + Zdim * 4  # SII + cache
+	usage += Zdim * YT.shape[1] * 2    # SIO + WZ
+
+	print 'Estimated Memory Usage: %d MB' % math.ceil(usage / 1024**2)
 	sys.exit()
 
 Zs = ()
@@ -39,18 +42,18 @@ Zs = ()
 #@profile
 def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 
-	global Zs
+	global Zs; Xsiz = X.shape[0]
 
 	if   Y  is None: mode = 'ftext'; err = None # Not in Use
 	elif WZ is None: mode = 'train'; err = None
 	else:            mode = 'test';  err = 0
 
-	for i in xrange(0, X.shape[0], bsiz):
+	for i in xrange(0, Xsiz, int(bsiz)):
 
-			print 'Processing Batch ' + str(int(i/bsiz)+1) + '/' + str(X.shape[0]/bsiz),
+			print 'Processing Batch %d/%d' % (i/bsiz + 1, math.ceil(Xsiz/bsiz)),
 			tic = time.time()
 
-			Xb = X[i:i+bsiz]
+			Xb = X[i:i+bsiz] if i != (Xsiz - Xsiz%bsiz) else X[i:i+Xsiz%bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
 
 			Zb = forward(net, Xb, cp)
@@ -124,12 +127,10 @@ for r in xrange(len(reg)):
 
 	print 'Solving Ridge Regression (r=%e)' % reg[r]
 
-	#if r == 0: rd = reg[r]
-	#else:      rd = reg[r]-reg[r-1]
-	
 	WZ = solve(SII, SIO, reg[r])
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
-	if settings.trnerr: print 'Training Error = %d' % epoch(XT, YT, WZ=WZ)
-	print                     'Test Error = %d'     % epoch(Xt, Yt, WZ=WZ)
+	if settings.trnerr: print 'Training Error = %d'   % epoch(XT, YT, WZ=WZ)
+	if Xv.shape[0] > 0: print 'Validation Error = %d' % epoch(Xv, Yv, WZ=WZ)
+	if Xt.shape[0] > 0: print 'Test Error = %d'       % epoch(Xt, Yt, WZ=WZ)
 

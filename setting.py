@@ -16,8 +16,8 @@ parser.add_argument('-batchsize', type=int, default=50)
 parser.add_argument('-biasterm', action='store_true')
 parser.add_argument('-regconst', type=float, default=[2.0,2.5,3.0,3.5,4.0], nargs='*')
 
-parser.add_argument('-trnerr', action='store_true')
-parser.add_argument('-memest', action='store_true')
+parser.add_argument('-trnerr',            action='store_true')
+parser.add_argument('-estmem', '-memest', action='store_true')
 
 TYPE = 0; EN = 1; PARAM = 2
 

@@ -9,9 +9,9 @@ from scipy.io import loadmat
 #B2 = loadmat('WB-deep2.mat')['B2'].astype('float32')
 #V  = loadmat('../V.mat')['V'].astype('float32').reshape(1,7,7,49)[...,:25].transpose(0,2,1,3)
 
-W1 = np.random.randn( 8, 1,7,7).astype('float32')
+W1 = np.random.randn(12, 1,7,7).astype('float32')
 B1 = None
-W2 = np.random.randn(16, 8,3,3).astype('float32')
+W2 = np.random.randn(32,12,3,3).astype('float32')
 B2 = None
 
 net = []

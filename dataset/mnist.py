@@ -3,11 +3,17 @@ import os, cPickle
 
 (XT, YT), (Xt, Yt) = cPickle.load(open(os.path.dirname(__file__)+'/mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
 
+#Xv = np.array([]); Yv = np.array([])
+Xv = XT[50000:];   Yv = YT[50000:]
+XT = XT[:50000];   YT = YT[:50000]
+
 XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') / 255
+Xv = Xv.reshape(Xv.shape[0], 1, 28, 28).astype('float32') / 255
 Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') / 255
 
 Xm = np.mean(XT, 0)[None,:,:,:]
 XT = XT - Xm
+Xv = Xv - Xm
 Xt = Xt - Xm
 
 def categorical(Y):
@@ -17,6 +23,7 @@ def categorical(Y):
         return YN
 
 YT = categorical(YT)
+Yv = categorical(Yv)
 Yt = categorical(Yt)
 
 from dataset.augmentation import *
