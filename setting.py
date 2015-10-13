@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-rseed', type=int, default=0)
 
 parser.add_argument('-dataset', default='mnist')
-parser.add_argument('-network', default=['mnist_refnet'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25
+parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25
 
 parser.add_argument('-pretrain', type=float, nargs=5) # iter, ratio, reg, weight sharing, damping rate
 

@@ -28,3 +28,7 @@ def rand_scl(X, s):
 	Y = Y[:, :, D[2][0]:D[2][1], D[3][0]:D[3][1]]
 	
 	return Y
+
+def rand_mir(X):
+
+	return X[:,:,:,::-1] if np.random.rand() > 0.5 else X
