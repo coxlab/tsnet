@@ -12,7 +12,7 @@ import numpy as np
 #W = loadmat('WB50.mat')['W'].astype('float32').transpose(3,2,0,1)
 #B = loadmat('WB50.mat')['B'].astype('float32')
 
-W = np.random.randn(100, 3, 5, 5).astype('float32')
+W = np.random.randn(50, 3, 5, 5).astype('float32')
 B = None
 
 #W /= np.linalg.norm(W)

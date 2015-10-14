@@ -43,4 +43,4 @@ Yt = categorical(Yt)
 
 from dataset.augmentation import *
 
-def aug(X): return rand_mir(X) # simple for now
+def aug(X): return rand_scl(rand_rot(rand_mir(X), 20), 0.1)

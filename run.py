@@ -10,8 +10,8 @@ settings = parser.parse_args(); np.random.seed(settings.rseed)
 exec 'from dataset.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
 net = netinit(settings.network)
 
-#XT = XT[:100]; Xt = Xt[:100]
-#YT = YT[:100]; Yt = Yt[:100]
+#XT = XT[:100]; Xv = Xv[:100]; Xt = Xt[:100]
+#YT = YT[:100]; Yv = Yv[:100]; Yt = Yt[:100]
 
 ## Setup Parameters & Define Epoch
 
@@ -50,8 +50,9 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 
 	for i in xrange(0, Xsiz, int(bsiz)):
 
-			print 'Processing Batch %d/%d' % (i/bsiz + 1, math.ceil(Xsiz/bsiz)),
-			tic = time.time()
+			if not settings.quiet:
+				print 'Processing Batch %d/%d' % (i/bsiz + 1, math.ceil(Xsiz/bsiz)),
+				tic = time.time()
 
 			Xb = X[i:i+bsiz] if i != (Xsiz - Xsiz%bsiz) else X[i:i+Xsiz%bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
@@ -60,7 +61,8 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 			Zs = Zb.shape[1:]
 			Zb = Zb.reshape(Zb.shape[0], -1)
 
-			print '[Dim(Z) = {0}]'.format(str(Zs)), 
+			if not settings.quiet:
+				print '[Dim(Z) = {0}]'.format(str(Zs)), 
 
 			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
@@ -68,13 +70,22 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 			elif mode == 'train': Yb = Y[i:i+bsiz]; SII, SIO = update(Zb, Yb, SII, SIO)
 			else:                 Yb = Y[i:i+bsiz]; err += np.count_nonzero(np.argmax(infer(Zb,WZ),1) - np.argmax(Yb,1))
 
-			toc = time.time()
-			print '(%f Seconds)\r' % (toc - tic),
-			sys.stdout.flush()
+			if not settings.quiet:
+				toc = time.time()
+				print '(%f Seconds)\r' % (toc - tic),
+				sys.stdout.flush()
 
-	sys.stdout.write("\033[K")
-	#print '\n',
+	if not settings.quiet:
+		sys.stdout.write("\033[K") # clear line (may not be safe)
+		#print '\n',
+
 	return tuple([e for e in [Z, SII, SIO, err] if e is not None])
+
+## Start Here
+
+print '-' * 80
+print 'Start Time'
+print time.ctime(); print '-' * 80
 
 ## Pre-train
 
@@ -101,6 +112,7 @@ if settings.pretrain is not None:
 			WZ = np.rollaxis(WZ, WZ.ndim-1)
 	
 			pretrain(net, WZ, l, pws, prat)
+			print time.ctime(); print '-' * 80
 
 	enable(net, 'di')
 
@@ -120,6 +132,8 @@ for n in xrange(num_epoch):
 		YT = YT[po]
 		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
+	print time.ctime(); print '-' * 80
+
 disable(net, 'dr')
 reg = 10 ** np.array(settings.regconst)
 
@@ -128,9 +142,11 @@ for r in xrange(len(reg)):
 	print 'Solving Ridge Regression (r=%e)' % reg[r]
 
 	WZ = solve(SII, SIO, reg[r])
+
 	print '||WZ|| = %e' % np.linalg.norm(WZ)
 
 	if settings.trnerr: print 'Training Error = %d'   % epoch(XT, YT, WZ=WZ)
 	if Xv.shape[0] > 0: print 'Validation Error = %d' % epoch(Xv, Yv, WZ=WZ)
 	if Xt.shape[0] > 0: print 'Test Error = %d'       % epoch(Xt, Yt, WZ=WZ)
 
+	print time.ctime(); print '-' * 80
