@@ -31,4 +31,4 @@ def rand_scl(X, s):
 
 def rand_mir(X):
 
-	return X[:,:,:,::-1] if np.random.rand() > 0.5 else X
+	return X[:,:,:,::-1] if np.random.rand() >= 0.5 else X

@@ -12,7 +12,7 @@ B = None
 #W = loadmat('WB50.mat')['W'].astype('float32').transpose(3,2,0,1)
 #B = loadmat('WB50.mat')['B'].astype('float32')
 
-#W = np.random.randn(300, 1, 7, 7).astype('float32')
+#W = np.random.randn(200, 1, 7, 7).astype('float32')
 #B = None
 
 #W /= np.linalg.norm(W)

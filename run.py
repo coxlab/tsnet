@@ -27,10 +27,10 @@ if settings.estmem:
 	Ztmp = forward(net, np.zeros_like(XT[:bsiz]))
 	Zdim = np.prod(Ztmp.shape[1:]) + int(bias_term)
 
-	usage  = XT.nbytes + YT.nbytes     # Dataset
+	usage  = XT.nbytes + YT.nbytes     # dataset
 	usage += Xv.nbytes + Yv.nbytes
 	usage += Xt.nbytes + Yt.nbytes
-	usage += Zdim * bsiz * 4           # Batch
+	usage += Zdim * bsiz * 4           # batch
 	usage += Zdim ** 2 * 4 + Zdim * 4  # SII + cache
 	usage += Zdim * YT.shape[1] * 2    # SIO + WZ
 
@@ -44,7 +44,7 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 
 	global Zs; Xsiz = X.shape[0]
 
-	if   Y  is None: mode = 'ftext'; err = None # Not in Use
+	if   Y  is None: mode = 'ftext'; err = None # not in use
 	elif WZ is None: mode = 'train'; err = None
 	else:            mode = 'test';  err = 0
 
@@ -54,7 +54,7 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 				print 'Processing Batch %d/%d' % (i/bsiz + 1, math.ceil(Xsiz/bsiz)),
 				tic = time.time()
 
-			Xb = X[i:i+bsiz] if i != (Xsiz - Xsiz%bsiz) else X[i:i+Xsiz%bsiz]
+			Xb = X[i:i+bsiz] # numpy fixes out-of-range access
 			Xb = aug(Xb) if aug is not None else Xb
 
 			Zb = forward(net, Xb, cp)
