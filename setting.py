@@ -8,6 +8,9 @@ parser.add_argument('-rseed', type=int, default=0)
 parser.add_argument('-dataset', default='mnist')
 parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25
 
+parser.add_argument('-lm',    type=int,   default=0) # 0:off >0:nSV
+parser.add_argument('-lmreg', type=float, default=[1.0,0.9,0.8,0.7,0.6,0.5], nargs='*')
+
 parser.add_argument('-pretrain', type=float, nargs=5) # iter, ratio, reg, weight sharing, damping rate
 
 parser.add_argument('-epoch',     type=int, default=1)
@@ -18,6 +21,7 @@ parser.add_argument('-regconst', type=float, default=[2.0,2.5,3.0,3.5,4.0], narg
 
 parser.add_argument('-trnerr',            action='store_true')
 parser.add_argument('-estmem', '-memest', action='store_true')
+# parser.add_argument('-maxmem', ...
 
 parser.add_argument('-quiet', '-q', action='store_true')
 

@@ -16,7 +16,8 @@ net = netinit(settings.network)
 ## Setup Parameters & Define Epoch
 
 from core.network import *
-from core.classifier import *
+if settings.lm: from core.classifier import update_lm, solve_lm, infer; update = lambda *arg: update_lm(*arg+(settings.lm,)); solve = lambda *arg: solve_lm(*arg+(settings.lm,));
+else:           from core.classifier import update,    solve,    infer
 
 num_epoch = settings.epoch
 bsiz      = settings.batchsize; bsiz = float(bsiz)
@@ -135,11 +136,11 @@ for n in xrange(num_epoch):
 	print time.ctime(); print '-' * 80
 
 disable(net, 'dr')
-reg = 10 ** np.array(settings.regconst)
+reg = settings.regconst if not settings.lm else settings.lmreg
 
 for r in xrange(len(reg)):
 
-	print 'Solving Ridge Regression (r=%e)' % reg[r]
+	print 'Solving Ridge Regression (r=%.2f)' % reg[r]
 
 	WZ = solve(SII, SIO, reg[r])
 
