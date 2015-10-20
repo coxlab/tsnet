@@ -1,6 +1,8 @@
 import numpy as np
 import os, cPickle
 
+## Configure Dataset
+
 (XT, YT), (Xt, Yt) = cPickle.load(open(os.path.dirname(__file__)+'/mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
 
 #Xv = np.array([]); Yv = np.array([])
@@ -26,6 +28,27 @@ YT = categorical(YT)
 Yv = categorical(Yv)
 Yt = categorical(Yt)
 
+## Define Augmentation
+
 from dataset.augmentation import *
 
 def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
+
+## Generate PCA Basis
+
+from skimage.util.shape import view_as_windows
+from scipy.linalg import svd
+from scipy.io import savemat
+
+for rfs in xrange(3, 11+1):
+
+	fn = os.path.dirname(__file__) + '/mnist-pc-rf%d.mat' % rfs
+
+	if not os.path.isfile(fn):
+
+		X       = view_as_windows(XT, (1, XT.shape[1], rfs, rfs)).squeeze((1,4))
+		X       = X.reshape(-1, XT.shape[1] * rfs**2)
+		_, _, V = svd(X, full_matrices=False, overwrite_a=True)
+		V       = V.reshape(-1, XT.shape[1], rfs, rfs)
+		
+		savemat(fn, {'V':V})

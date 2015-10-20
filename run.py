@@ -8,7 +8,7 @@ from setting import *
 settings = parser.parse_args(); np.random.seed(settings.rseed)
 
 exec 'from dataset.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
-net = netinit(settings.network)
+net = netinit(settings.network, settings.dataset)
 
 #XT = XT[:100]; Xv = Xv[:100]; Xt = Xt[:100]
 #YT = YT[:100]; Yv = Yv[:100]; Yt = Yt[:100]
@@ -85,19 +85,19 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 ## Start Here
 
 print '-' * 80
-print 'Start Time'
-print time.ctime(); print '-' * 80
+print 'Network and Dataset Loaded'
+print '-' * 55,; print time.ctime()
 
 ## Pre-train
 
 if settings.pretrain is not None:
 
-	disable(net, 'di')
+	#disable(net, 'di')
 
 	ci   = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c']
 	pitr = int(settings.pretrain[0])
 	plen = XT.shape[0] * settings.pretrain[1]
-	preg = 10 ** settings.pretrain[2]
+	preg = settings.pretrain[2]
 	pws  = True if settings.pretrain[3] == 1 else False
 	prat = settings.pretrain[4]
 
@@ -105,7 +105,7 @@ if settings.pretrain is not None:
 
 		for l in ci[::-1]: # Top-down Order
 
-			print 'Pre-training Layer %d' % (l+1)
+			print 'Pre-training (Layer %d Iter %d)' % (l+1, i+1)
 			WZ = solve(*epoch(XT[:plen], YT[:plen], SII=None, SIO=None, cp=[l]) + (preg,))
 	
 			WZ = WZ[:-1] if bias_term else WZ
@@ -113,9 +113,9 @@ if settings.pretrain is not None:
 			WZ = np.rollaxis(WZ, WZ.ndim-1)
 	
 			pretrain(net, WZ, l, pws, prat)
-			print time.ctime(); print '-' * 80
+			print '-' * 55,; print time.ctime()
 
-	enable(net, 'di')
+	#enable(net, 'di')
 
 ## Train and Test
 
@@ -133,7 +133,7 @@ for n in xrange(num_epoch):
 		YT = YT[po]
 		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
 
-	print time.ctime(); print '-' * 80
+	print '-' * 55,; print time.ctime()
 
 disable(net, 'dr')
 reg = settings.regconst if not settings.lm else settings.lmreg
@@ -144,10 +144,9 @@ for r in xrange(len(reg)):
 
 	WZ = solve(SII, SIO, reg[r])
 
-	print '||WZ|| = %e' % np.linalg.norm(WZ)
-
-	if settings.trnerr: print 'Training Error = %d'   % epoch(XT, YT, WZ=WZ)
+	print                     '||WZ||           = %e' % np.linalg.norm(WZ)
+	if settings.trnerr: print 'Training Error   = %d' % epoch(XT, YT, WZ=WZ)
 	if Xv.shape[0] > 0: print 'Validation Error = %d' % epoch(Xv, Yv, WZ=WZ)
-	if Xt.shape[0] > 0: print 'Test Error = %d'       % epoch(Xt, Yt, WZ=WZ)
+	if Xt.shape[0] > 0: print 'Test Error       = %d' % epoch(Xt, Yt, WZ=WZ)
 
-	print time.ctime(); print '-' * 80
+	print '-' * 55,; print time.ctime()

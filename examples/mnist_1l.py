@@ -12,10 +12,11 @@ B = None
 #W = loadmat('WB50.mat')['W'].astype('float32').transpose(3,2,0,1)
 #B = loadmat('WB50.mat')['B'].astype('float32')
 
-#W = np.random.randn(500, 1, 7, 7).astype('float32')
+#W = np.random.randn(55, 1, 7, 7).astype('float32')
 #B = None
 
 #W /= np.linalg.norm(W)
+V = V[:,:,:,:,None,None]
 
 net = []
 
