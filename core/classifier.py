@@ -3,7 +3,7 @@ from scipy.linalg import svd, eigh, qr
 from scipy.linalg.blas import ssyrk
 from scipy.linalg.lapack import sposv 
 
-#@profile
+@profile
 def qr_append(Q, c):
 
 	R = np.zeros((Q.shape[1], Q.shape[1]-c), dtype='float32')
@@ -15,15 +15,9 @@ def qr_append(Q, c):
 	# Orthogonalize among Q2
 	Q[:,c:], R[c:,:] = qr(Q[:,c:], mode='economic', lwork=R.shape[1], overwrite_a=True)
 
-	#for i in xrange(c, Q.shape[1]):
-	#	R[c:i,i-c]  = np.dot(Q[:,c:i].T, Q[:,i]    )
-	#	Q[:  ,i  ] -= np.dot(Q[:,c:i]  , R[c:i,i-c])
-	#	R[i  ,i-c]  = np.linalg.norm(Q[:,i])
-	#	Q[:  ,i  ] /= R[i,i-c]
-
 	return Q, R
 
-#@profile
+@profile
 def update_lm(Z, Y, SII, SIO, nSV):
 
 	if SII is None:
@@ -34,9 +28,9 @@ def update_lm(Z, Y, SII, SIO, nSV):
 		U, R = qr_append(np.hstack((U, Z.T)), U.shape[1])
 
 		S = np.zeros((R.shape[0],)*2, dtype='float32', order='F'); S[(np.arange(len(s)),) * 2] = s
-		ssyrk(alpha=1.0, a=R, trans=0, beta=1.0, c=S, overwrite_c=1)
+		ssyrk(alpha=1.0, a=R, trans=0, beta=1.0, c=S, overwrite_c=1); S += S.T; S[np.diag_indices_from(S)] /= 2
 
-		s, P = eigh(S, lower=False, overwrite_a=True); s = s[::-1]; P = P[:,::-1]
+		s, P = eigh(S, overwrite_a=True); s = s[::-1]; P = P[:,::-1]
 		U    = np.dot(U, P)
 
 	SII = U[:,:nSV], s[:nSV]
