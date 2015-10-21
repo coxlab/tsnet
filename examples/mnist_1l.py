@@ -16,7 +16,7 @@ B = None
 #B = None
 
 #W /= np.linalg.norm(W)
-V = V[:,:,:,:,None,None]
+V = V[:,:,:,None,None,:]
 
 net = []
 

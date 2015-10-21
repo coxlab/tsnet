@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-rseed', type=int, default=0)
 
 parser.add_argument('-dataset', default='mnist')
-parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25
+parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25/1
 
 parser.add_argument('-lm',    type=int,   default=0) # 0:off >0:nSV
 parser.add_argument('-lmreg', type=float, default=[1.0,0.9,0.8,0.7,0.6,0.5], nargs='*')
@@ -60,16 +60,26 @@ def netinit(netspec, ds=None):
 			
 			elif net[l][TYPE][:2] == 'di':
 
-				if len(net[l]) <= 3: # only one param
-					net[l][PARAM]    = loadmat('dataset/' + ds + '-pc-rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
-					net[l][PARAM]    = net[l][PARAM].transpose(1,2,3,0)[:,:,:,:,None,None]
-				else:
-					net[l]           = net[l][:-1] # remove flag for random basis
+				if len(net[l]) <= PARAM+1: # Random Bases
+
 					net[l][PARAM]    = np.random.randn(np.prod(net[d][PARAM].shape[1:]), net[l][PARAM]).astype('float32')
 					net[l][PARAM], _ = qr(net[l][PARAM], mode='economic')
-					net[l][PARAM]    = net[l][PARAM].reshape(net[d][PARAM].shape[1:] + (-1,1,1))
+					net[l][PARAM]    = net[l][PARAM].reshape(net[d][PARAM].shape[1:] + (1,1,-1))
+
+				else: # PCA Bases
+
+					net[l][PARAM] = loadmat('dataset/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
+					net[l][PARAM] = net[l][PARAM].transpose(1,2,3,0)[:,:,:,None,None,:]
+
+					if net[l][PARAM+1] == 1: # Reinitialize W of CONV with PCA Bases
+
+						net[d][PARAM] = np.random.randn(net[d][PARAM].shape[0], 1, 1, net[l][PARAM].shape[-1]).astype('float32')
+						net[d][PARAM] = np.tensordot(net[d][PARAM], net[l][PARAM], ([1,2,3],[3,4,5]))
+
+					net[l] = net[l][:-1]
 		
 	else: # Define Using Examples
+
 		exec 'from examples.%s import net' % netspec[0]
 
 	return net

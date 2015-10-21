@@ -1,7 +1,7 @@
+## Configure Dataset
+
 import numpy as np
 import os, cPickle
-
-## Configure Dataset
 
 (XT, YT), (Xt, Yt) = cPickle.load(open(os.path.dirname(__file__)+'/mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
 
@@ -28,27 +28,35 @@ YT = categorical(YT)
 Yv = categorical(Yv)
 Yt = categorical(Yt)
 
-## Define Augmentation
+if __name__ != '__main__':
 
-from dataset.augmentation import *
+	## Define Augmentation
 
-def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
+	from dataset.augmentation import *
+	def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
 
-## Generate PCA Basis
+else:
 
-from skimage.util.shape import view_as_windows
-from scipy.linalg import svd
-from scipy.io import savemat
+	## Generate PCA Bases
 
-for rfs in xrange(3, 11+1):
+	from skimage.util.shape import view_as_windows
+	from scipy.linalg.blas import ssyrk
+	from scipy.linalg import eigh
+	from scipy.io import savemat
 
-	fn = os.path.dirname(__file__) + '/mnist-pc-rf%d.mat' % rfs
+	for rfs in xrange(3, 11+1):
 
-	if not os.path.isfile(fn):
+		fn = os.path.dirname(__file__) + '/mnist_pc_rf%d.mat' % rfs
 
-		X       = view_as_windows(XT, (1, XT.shape[1], rfs, rfs)).squeeze((1,4))
-		X       = X.reshape(-1, XT.shape[1] * rfs**2)
-		_, _, V = svd(X, full_matrices=False, overwrite_a=True)
-		V       = V.reshape(-1, XT.shape[1], rfs, rfs)
+		if not os.path.isfile(fn):
+
+			print 'Generating PCA Bases for RFS=%d' % rfs
+
+			X    = view_as_windows(XT, (1, XT.shape[1], rfs, rfs)).squeeze((1,4))
+			X    = X.reshape(-1, XT.shape[1] * rfs**2)
+			X    = ssyrk(alpha=1.0, a=X, trans=1); X += X.T; X[np.diag_indices_from(X)] /= 2
+			_, V = eigh(X, overwrite_a=True)
+			V    = V[:,::-1].T
+			V    = V.reshape(-1, XT.shape[1], rfs, rfs)
 		
-		savemat(fn, {'V':V})
+			savemat(fn, {'V':V})
