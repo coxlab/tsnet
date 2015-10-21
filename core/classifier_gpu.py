@@ -1,37 +1,45 @@
 import numpy as np
-from scipy.linalg import svd, eigh, qr
+import cupy as cp
+from scipy.linalg import svd, eigh
 from scipy.linalg.blas import ssyrk
 from scipy.linalg.lapack import sposv 
 
 #@profile
 def qr_append(Q, c):
 
-	R = np.zeros((Q.shape[1], Q.shape[1]-c), dtype='float32')
+	R = cp.zeros((Q.shape[1], Q.shape[1]-c), dtype='float32')
 
 	# Orthogonalize Q2 against Q1
-	R[:c,:]  = np.dot(Q[:,:c].T, Q[:,c:])
-	Q[:,c:] -= np.dot(Q[:,:c]  , R[:c,:])
+	R[:c,:]  = cp.dot(Q[:,:c].T, Q[:,c:])
+	Q[:,c:] -= cp.dot(Q[:,:c]  , R[:c,:])
 
 	# Orthogonalize among Q2
-	Q[:,c:], R[c:,:] = qr(Q[:,c:], mode='economic', lwork=R.shape[1], overwrite_a=True)
+	for i in xrange(c, Q.shape[1]):
+		if i > c:
+			R[c:i,i-c]  = cp.dot(Q[:,c:i].T, Q[:,i]    )
+			Q[:  ,i  ] -= cp.dot(Q[:,c:i]  , R[c:i,i-c])
 
-	return Q, R
+		R[i  ,i-c]  = cp.sqrt(cp.sum(cp.square(Q[:,i])))
+		Q[:  ,i  ] /= R[i,i-c]
+
+	return Q, cp.asnumpy(R)
 
 #@profile
 def update_lm(Z, Y, SII, SIO, nSV):
 
 	if SII is None:
 		U, s, _ = svd(Z.T, full_matrices=False, overwrite_a=True); s **= 2
+		U       = cp.array(U)
 
 	else:
 		U, s = SII[0], SII[1]
-		U, R = qr_append(np.hstack((U, Z.T)), U.shape[1])
+		U, R = qr_append(cp.hstack((U, cp.array(Z.T))), U.shape[1])
 
 		S = np.zeros((R.shape[0],)*2, dtype='float32', order='F'); S[(np.arange(len(s)),) * 2] = s
 		ssyrk(alpha=1.0, a=R, trans=0, beta=1.0, c=S, overwrite_c=1); S += S.T; S[np.diag_indices_from(S)] /= 2
 
 		s, P = eigh(S, overwrite_a=True); s = s[::-1]; P = P[:,::-1]
-		U    = np.dot(U, P)
+		U    = cp.dot(U, cp.array(P))
 
 	SII = U[:,:nSV], s[:nSV]
 
@@ -43,8 +51,8 @@ def update_lm(Z, Y, SII, SIO, nSV):
 #@profile
 def solve_lm(SII, SIO, reg, nSV):
 	
-	U = SII[0][:,:reg*nSV]
-	s = SII[1][  :reg*nSV] # + reg
+	U = cp.asnumpy(SII[0])[:,:reg*nSV]
+	s =            SII[1] [  :reg*nSV] # + reg
 
 	WZ = np.dot(U.T, SIO)
 	WZ = np.dot(np.diag(1/s), WZ)
