@@ -1,0 +1,16 @@
+import os
+import numpy as np
+from scipy.io import savemat, loadmat
+
+TYPE = 0; EN = 1; PARAM = 2
+
+def saveW(net, fn):
+
+	if os.path.isfile(fn): W = loadmat(fn)['W']
+	else                 : W = np.zeros(0, dtype=np.object)
+
+	for l in xrange(len(net)):
+
+		if net[l][TYPE][:1] == 'c': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = net[l][PARAM]
+
+	savemat(fn, {'W':W})

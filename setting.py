@@ -2,10 +2,12 @@ import argparse
 import numpy as np
 from scipy.linalg import qr
 from scipy.io import loadmat
+from tools import saveW
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('-rseed', type=int, default=0)
+parser.add_argument('-rseed', type=int, default=0 )
+parser.add_argument('-save' ,           default='') # filename
 
 parser.add_argument('-dataset', default='mnist')
 parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25/1
@@ -28,7 +30,7 @@ parser.add_argument('-quiet', '-q', action='store_true')
 
 TYPE = 0; EN = 1; PARAM = 2
 
-def netinit(netspec, ds=None):
+def netinit(netspec, ds=None, fn=''):
 
 	if ':' in netspec[0]: # Define Using Strings
 		
@@ -77,10 +79,13 @@ def netinit(netspec, ds=None):
 						net[d][PARAM] = np.tensordot(net[d][PARAM], net[l][PARAM], ([1,2,3],[3,4,5]))
 
 					net[l] = net[l][:-1]
-		
+
 	else: # Define Using Examples
 
 		exec 'from examples.%s import net' % netspec[0]
+
+	# Save W's
+	if fn: saveW(net, fn)
 
 	return net
 
