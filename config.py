@@ -2,7 +2,6 @@ import argparse
 import numpy as np
 from scipy.linalg import qr
 from scipy.io import loadmat
-from tools import saveW
 
 parser = argparse.ArgumentParser()
 
@@ -30,7 +29,7 @@ parser.add_argument('-quiet', '-q', action='store_true')
 
 TYPE = 0; EN = 1; PARAM = 2
 
-def netinit(netspec, ds=None, fn=''):
+def netinit(netspec, ds=None):
 
 	if ':' in netspec[0]: # Define Using Strings
 		
@@ -70,7 +69,7 @@ def netinit(netspec, ds=None, fn=''):
 
 				else: # PCA Bases
 
-					net[l][PARAM] = loadmat('dataset/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
+					net[l][PARAM] = loadmat('datasets/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
 					net[l][PARAM] = net[l][PARAM].transpose(1,2,3,0)[:,:,:,None,None,:]
 
 					if net[l][PARAM+1] == 1: # Reinitialize W of CONV with PCA Bases
@@ -83,9 +82,6 @@ def netinit(netspec, ds=None, fn=''):
 	else: # Define Using Examples
 
 		exec 'from examples.%s import net' % netspec[0]
-
-	# Save W's
-	if fn: saveW(net, fn)
 
 	return net
 

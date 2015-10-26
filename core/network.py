@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse.linalg import svds
 from core.layers import *
-from setting import TYPE, EN, PARAM
+from config import TYPE, EN, PARAM
 
 def redimension(Z, P, depth=1, mode='D'):
 

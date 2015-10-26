@@ -1,14 +1,15 @@
 import math, sys, time
 import numpy as np
 import warnings; warnings.filterwarnings("ignore")
+from tools import *
 
 ## Load Dataset & Network
 
-from setting import *
+from config import *
 settings = parser.parse_args(); np.random.seed(settings.rseed)
 
-exec 'from dataset.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
-net = netinit(settings.network, settings.dataset, settings.save)
+exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
+net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
 
 #XT = XT[:100]; Xv = Xv[:100]; Xt = Xt[:100]
 #YT = YT[:100]; Yv = Yv[:100]; Yt = Yt[:100]
@@ -90,8 +91,6 @@ print '-' * 55,; print time.ctime()
 
 ## Pre-train
 
-from tools import saveW
-
 if settings.pretrain is not None:
 
 	#disable(net, 'di')
@@ -117,7 +116,7 @@ if settings.pretrain is not None:
 			pretrain(net, WZ, l, pws, prat)
 			print '-' * 55,; print time.ctime()
 
-		if settings.save: saveW(net, settings.save)
+		saveW(net, settings.save)
 
 	#enable(net, 'di')
 

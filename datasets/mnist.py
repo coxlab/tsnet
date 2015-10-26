@@ -32,7 +32,7 @@ if __name__ != '__main__':
 
 	## Define Augmentation
 
-	from dataset.augmentation import *
+	from datasets.augmentation import *
 	def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
 
 else:

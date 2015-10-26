@@ -1,10 +1,11 @@
 import os
 import numpy as np
 from scipy.io import savemat, loadmat
-
-TYPE = 0; EN = 1; PARAM = 2
+from config import TYPE, EN, PARAM
 
 def saveW(net, fn):
+
+	if not fn: return
 
 	if os.path.isfile(fn): W = loadmat(fn)['W']
 	else                 : W = np.zeros(0, dtype=np.object)

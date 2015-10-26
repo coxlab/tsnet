@@ -41,6 +41,6 @@ def categorical(Y):
 YT = categorical(YT)
 Yt = categorical(Yt)
 
-from dataset.augmentation import *
+from datasets.augmentation import *
 
 def aug(X): return rand_scl(rand_rot(rand_mir(X), 20), 0.1)
