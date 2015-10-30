@@ -14,7 +14,7 @@ parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:5
 parser.add_argument('-lm',    type=int,   default=0) # 0:off >0:nSV
 parser.add_argument('-lmreg', type=float, default=[1.0,0.9,0.8,0.7,0.6,0.5], nargs='*')
 
-parser.add_argument('-pretrain', type=float, nargs=5) # iter, ratio, reg, weight sharing, damping rate
+parser.add_argument('-pretrain', type=float, nargs='*') # iter, ratio, reg, weight sharing, damping rate, keeping dim reduc
 
 parser.add_argument('-epoch',     type=int, default=1)
 parser.add_argument('-batchsize', type=int, default=50)

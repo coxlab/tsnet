@@ -12,7 +12,7 @@ exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
 net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
 
 #XT = XT[:100]; Xv = Xv[:100]; Xt = Xt[:100]
-#YT = YT[:100]; Yv = Yv[:100]; Yt = Yt[:100]
+def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
 ## Setup Parameters & Define Epoch
 
@@ -93,7 +93,7 @@ print '-' * 55,; print time.ctime()
 
 if settings.pretrain is not None:
 
-	#disable(net, 'di')
+	if len(settings.pretrain) > 5 and not settings.pretrain[5]: disable(net, 'di')
 
 	ci   = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c']
 	pitr = int(settings.pretrain[0])
@@ -103,6 +103,8 @@ if settings.pretrain is not None:
 	prat = settings.pretrain[4]
 
 	for i in xrange(pitr): # Iterations
+
+		XT, YT = shuffle(XT, YT)
 
 		for l in ci[::-1]: # Top-down Order
 
@@ -118,7 +120,8 @@ if settings.pretrain is not None:
 
 		saveW(net, settings.save)
 
-	#enable(net, 'di')
+enable (net, 'di')
+disable(net, 'dr') 
 
 ## Train and Test
 
@@ -128,17 +131,13 @@ for n in xrange(num_epoch):
 	
 	print 'Gathering SII/SIO (Epoch %d)' % (n+1)
 
-	if n < 1:
-		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO)
-	else: # Data Augmentation
-		po = np.random.permutation(XT.shape[0])
-		XT = XT[po]
-		YT = YT[po]
-		SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug)
+	XT, YT = shuffle(XT, YT)
+
+	if n < 1: SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO)
+	else    : SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug) # Data Augmentation
 
 	print '-' * 55,; print time.ctime()
 
-disable(net, 'dr')
 reg = settings.regconst if not settings.lm else settings.lmreg
 
 for r in xrange(len(reg)):
