@@ -14,4 +14,4 @@ def saveW(net, fn):
 
 		if net[l][TYPE][:1] == 'c': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = net[l][PARAM]
 
-	savemat(fn, {'W':W})
+	savemat(fn, {'W':W}, appendmat=False)

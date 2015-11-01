@@ -17,8 +17,9 @@ def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 ## Setup Parameters & Define Epoch
 
 from core.network import *
-if settings.lm: from core.classifier import update_lm, solve_lm, infer; update = lambda *arg: update_lm(*arg+(settings.lm,)); solve = lambda *arg: solve_lm(*arg+(settings.lm,));
-else:           from core.classifier import update,    solve,    infer
+
+if not settings.lm: from classifier.ridge   import *; arg = ()
+else              : from classifier.lowrank import *; arg = (settings.lm,)
 
 num_epoch = settings.epoch
 bsiz      = settings.batchsize; bsiz = float(bsiz)
@@ -42,13 +43,12 @@ if settings.estmem:
 Zs = ()
 
 #@profile
-def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
+def epoch(X, Y, model, aug=None, cp=[]):
 
 	global Zs; Xsiz = X.shape[0]
 
-	if   Y  is None: mode = 'ftext'; err = None # not in use
-	elif WZ is None: mode = 'train'; err = None
-	else:            mode = 'test';  err = 0
+	if model.WZ is None: mode = 'train'; err = None
+	else               : mode = 'test' ; err = 0
 
 	for i in xrange(0, Xsiz, int(bsiz)):
 
@@ -57,6 +57,7 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 				tic = time.time()
 
 			Xb = X[i:i+bsiz] # numpy fixes out-of-range access
+			Yb = Y[i:i+bsiz]
 			Xb = aug(Xb) if aug is not None else Xb
 
 			Zb = forward(net, Xb, cp)
@@ -68,9 +69,8 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 
 			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
-			if   mode == 'ftext': Z = (Zb,) if Z is None else Z + (Zb,); continue
-			elif mode == 'train': Yb = Y[i:i+bsiz]; SII, SIO = update(Zb, Yb, SII, SIO)
-			else:                 Yb = Y[i:i+bsiz]; err += np.count_nonzero(np.argmax(infer(Zb,WZ),1) - np.argmax(Yb,1))
+			if mode == 'train': update(model, Zb, Yb)
+			else              : err += np.count_nonzero(np.argmax(infer(model,Zb),1) - np.argmax(Yb,1))
 
 			if not settings.quiet:
 				toc = time.time()
@@ -81,7 +81,7 @@ def epoch(X, Y=None, Z=None, WZ=None, SII=None, SIO=None, aug=None, cp=[]):
 		sys.stdout.write("\033[K") # clear line (may not be safe)
 		#print '\n',
 
-	return tuple([e for e in [Z, SII, SIO, err] if e is not None])
+	if mode == 'test': return err
 
 ## Start Here
 
@@ -109,13 +109,16 @@ if settings.pretrain is not None:
 		for l in ci[::-1]: # Top-down Order
 
 			print 'Pre-training (Layer %d Iter %d)' % (l+1, i+1)
-			WZ = solve(*epoch(XT[:plen], YT[:plen], SII=None, SIO=None, cp=[l]) + (preg,))
+
+			model = Linear(*arg)
+			epoch(XT[:plen], YT[:plen], model, cp=[l])
+			solve(model, preg)
 	
-			WZ = WZ[:-1] if bias_term else WZ
-			WZ = WZ.reshape(Zs + (-1,))
-			WZ = np.rollaxis(WZ, WZ.ndim-1)
+			model.WZ = model.WZ[:-1] if bias_term else model.WZ
+			model.WZ = model.WZ.reshape(Zs + (-1,))
+			model.WZ = np.rollaxis(model.WZ, -1)
 	
-			pretrain(net, WZ, l, pws, prat)
+			pretrain(net, model.WZ, l, pws, prat)
 			print '-' * 55,; print time.ctime()
 
 		saveW(net, settings.save)
@@ -125,7 +128,7 @@ disable(net, 'dr')
 
 ## Train and Test
 
-SII, SIO = (None,)*2
+model = Linear(*arg)
 
 for n in xrange(num_epoch):
 	
@@ -133,22 +136,22 @@ for n in xrange(num_epoch):
 
 	XT, YT = shuffle(XT, YT)
 
-	if n < 1: SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO)
-	else    : SII, SIO = epoch(XT, YT, SII=SII, SIO=SIO, aug=aug) # Data Augmentation
+	if n < 1: epoch(XT, YT, model)
+	else    : epoch(XT, YT, model, aug=aug) # Data Augmentation
 
 	print '-' * 55,; print time.ctime()
 
-reg = settings.regconst if not settings.lm else settings.lmreg
+param = settings.regconst if not settings.lm else settings.lmconst
 
-for r in xrange(len(reg)):
+for p in xrange(len(param)):
 
-	print 'Solving Ridge Regression (r=%.2f)' % reg[r]
+	print 'Solving Linear Model (param = %.2f)' % param[p]
 
-	WZ = solve(SII, SIO, reg[r])
+	solve(model, param[p])
 
-	print                     '||WZ||           = %e' % np.linalg.norm(WZ)
-	if settings.trnerr: print 'Training Error   = %d' % epoch(XT, YT, WZ=WZ)
-	if Xv.shape[0] > 0: print 'Validation Error = %d' % epoch(Xv, Yv, WZ=WZ)
-	if Xt.shape[0] > 0: print 'Test Error       = %d' % epoch(Xt, Yt, WZ=WZ)
+	print                     '||WZ||           = %e' % np.linalg.norm(model.WZ)
+	if settings.trnerr: print 'Training Error   = %d' % epoch(XT, YT, model)
+	if Xv.shape[0] > 0: print 'Validation Error = %d' % epoch(Xv, Yv, model)
+	if Xt.shape[0] > 0: print 'Test Error       = %d' % epoch(Xt, Yt, model)
 
 	print '-' * 55,; print time.ctime()

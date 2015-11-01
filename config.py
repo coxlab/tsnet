@@ -11,8 +11,8 @@ parser.add_argument('-save' ,           default='') # filename
 parser.add_argument('-dataset', default='mnist')
 parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25/1
 
-parser.add_argument('-lm',    type=int,   default=0) # 0:off >0:nSV
-parser.add_argument('-lmreg', type=float, default=[1.0,0.9,0.8,0.7,0.6,0.5], nargs='*')
+parser.add_argument('-lm',      type=int,   default=0) # 0:off >0:nSV
+parser.add_argument('-lmconst', type=float, default=[1.0,0.9,0.8,0.7,0.6,0.5], nargs='*')
 
 parser.add_argument('-pretrain', type=float, nargs='*') # iter, ratio, reg, weight sharing, damping rate, keeping dim reduc
 
