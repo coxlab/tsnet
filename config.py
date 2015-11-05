@@ -1,33 +1,40 @@
-import argparse
+## Default Settings
+
+EXACT_DEFAULT   = [2.0, 2.5, 3.0, 3.5, 4.0]
+LOWRANK_DEFAULT = [500, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5]
+ASGD_DEFAULT    = [1e-3, 1e-2]
+LC_DEFAULT      = [EXACT_DEFAULT, LOWRANK_DEFAULT, ASGD_DEFAULT]
+
+import argparse; parser = argparse.ArgumentParser()
+
+parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25/1
+parser.add_argument('-dataset', default='mnist')
+
+parser.add_argument('-batchsize', type=int, default=50)
+
+parser.add_argument('-epoch'  , type=int  , default=1            )
+parser.add_argument('-lrnfreq', type=int  , default=1            ) # learn N times per epoch until no more rate specified
+parser.add_argument('-lrnrate', type=float, default=[], nargs='*') # 0.5
+parser.add_argument('-lrntied',             action='store_true'  )
+
+parser.add_argument('-lc'     , type=int  , default=0                    )
+parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
+parser.add_argument('-bias'   ,             action='store_true'          )
+
+parser.add_argument('-trnerr',            action='store_true')
+parser.add_argument('-quiet' , '-q'     , action='store_true')
+parser.add_argument('-estmem', '-memest', action='store_true') # '-maxmem'
+
+parser.add_argument('-seed', type=int, default=0 )
+parser.add_argument('-save',           default='') # save Ws to filename
+
+## Network Initialization
+
+TYPE = 0; EN = 1; PARAM = 2
+
 import numpy as np
 from scipy.linalg import qr
 from scipy.io import loadmat
-
-parser = argparse.ArgumentParser()
-
-parser.add_argument('-rseed', type=int, default=0 )
-parser.add_argument('-save' ,           default='') # filename
-
-parser.add_argument('-dataset', default='mnist')
-parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25/1
-
-parser.add_argument('-lm',      type=int,   default=0) # 0:off >0:nSV
-parser.add_argument('-lmconst', type=float, default=[1.0,0.9,0.8,0.7,0.6,0.5], nargs='*')
-
-parser.add_argument('-pretrain', type=float, nargs='*') # iter, ratio, reg, weight sharing, damping rate, keeping dim reduc
-
-parser.add_argument('-epoch',     type=int, default=1)
-parser.add_argument('-batchsize', type=int, default=50)
-
-parser.add_argument('-biasterm', action='store_true')
-parser.add_argument('-regconst', type=float, default=[2.0,2.5,3.0,3.5,4.0], nargs='*')
-
-parser.add_argument('-trnerr',            action='store_true')
-parser.add_argument('-estmem', '-memest', action='store_true') # '-maxmem'
-
-parser.add_argument('-quiet', '-q', action='store_true')
-
-TYPE = 0; EN = 1; PARAM = 2
 
 def netinit(netspec, ds=None):
 

@@ -46,7 +46,7 @@ def enable(net, lt):
 # W : cho, chi, wy, wx
 # WZ: class, (...), cho, y, x, chi, wy, wx
 
-def pretrain(net, WZ, l=None, ws=True, rate=1.0):
+def train(net, WZ, l=None, tied=True, rate=1.0):
 
 	l = np.amin([i for i in xrange(len(net)) if net[i][TYPE][0] == 'c']) if l is None else l
 
@@ -62,7 +62,7 @@ def pretrain(net, WZ, l=None, ws=True, rate=1.0):
 
 	for ch in xrange(WZ.shape[-6]):
 
-		if ws: # Weight-shared Update
+		if tied: # Weight-shared Update
 			_, _, V = svds(WZ[...,ch,:,:,:,:,:].reshape(-1, np.prod(WZ.shape[-3:])), k=1)
 			V       = np.sign(np.dot(W[ch].ravel(), V.ravel())) * V.reshape(W[ch].shape)
 		else:

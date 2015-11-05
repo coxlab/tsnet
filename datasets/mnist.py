@@ -20,7 +20,8 @@ Xt = Xt - Xm
 
 def categorical(Y):
 
-        YN = np.zeros((Y.shape[0], np.amax(Y)+1)).astype('float32')
+        #YN = np.zeros((Y.shape[0], np.amax(Y)+1)).astype('float32')
+	YN = -np.ones((Y.shape[0], np.amax(Y)+1)).astype('float32')
         YN[np.indices(Y.shape), Y] = 1
         return YN
 

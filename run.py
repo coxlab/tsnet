@@ -6,34 +6,34 @@ from tools import *
 ## Load Dataset & Network
 
 from config import *
-settings = parser.parse_args(); np.random.seed(settings.rseed)
+settings = parser.parse_args(); np.random.seed(settings.seed)
 
-exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
 net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
 
+exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
 #XT = XT[:100]; Xv = Xv[:100]; Xt = Xt[:100]
+
 def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
 ## Setup Parameters & Define Epoch
 
 from core.network import *
 
-if not settings.lm: from classifier.ridge   import *; arg = ()
-else              : from classifier.lowrank import *; arg = (settings.lm,)
+if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lc]
 
-num_epoch = settings.epoch
-bsiz      = settings.batchsize; bsiz = float(bsiz)
-bias_term = settings.biasterm
+if   settings.lc == 0: from classifier.exact     import *; lcarg = ()
+elif settings.lc == 1: from classifier.lowrank   import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
+else                 : from classifier.asgd      import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
 if settings.estmem:
 	
 	Ztmp = forward(net, np.zeros_like(XT[:bsiz]))
-	Zdim = np.prod(Ztmp.shape[1:]) + int(bias_term)
+	Zdim = np.prod(Ztmp.shape[1:]) + int(settings.bias)
 
 	usage  = XT.nbytes + YT.nbytes     # dataset
 	usage += Xv.nbytes + Yv.nbytes
 	usage += Xt.nbytes + Yt.nbytes
-	usage += Zdim * bsiz * 4           # batch
+	usage += Zdim * settings.batchsize * 4 # batch
 	usage += Zdim ** 2 * 4 + Zdim * 4  # SII + cache
 	usage += Zdim * YT.shape[1] * 2    # SIO + WZ
 
@@ -43,21 +43,19 @@ if settings.estmem:
 Zs = ()
 
 #@profile
-def epoch(X, Y, model, aug=None, cp=[]):
+def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
-	global Zs; Xsiz = X.shape[0]
+	global Zs; err = 0
 
-	if model.WZ is None: mode = 'train'; err = None
-	else               : mode = 'test' ; err = 0
-
-	for i in xrange(0, Xsiz, int(bsiz)):
+	for i in xrange(0, X.shape[0], settings.batchsize):
 
 			if not settings.quiet:
-				print 'Processing Batch %d/%d' % (i/bsiz + 1, math.ceil(Xsiz/bsiz)),
+				print 'Processing Batch %d/%d' % (i/float(settings.batchsize) + 1, math.ceil(X.shape[0]/float(settings.batchsize))),
 				tic = time.time()
 
-			Xb = X[i:i+bsiz] # numpy fixes out-of-range access
-			Yb = Y[i:i+bsiz]
+			Xb = X[i:i+settings.batchsize] # numpy fixes out-of-range access
+			Yb = Y[i:i+settings.batchsize]
+
 			Xb = aug(Xb) if aug is not None else Xb
 
 			Zb = forward(net, Xb, cp)
@@ -67,10 +65,10 @@ def epoch(X, Y, model, aug=None, cp=[]):
 			if not settings.quiet:
 				print '[Dim(Z) = {0}]'.format(str(Zs)), 
 
-			if bias_term: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
+			if settings.bias: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
-			if mode == 'train': update(model, Zb, Yb)
-			else              : err += np.count_nonzero(np.argmax(infer(model,Zb),1) - np.argmax(Yb,1))
+			if mode == 'train': update(classifier, Zb, Yb)
+			else              : err += np.count_nonzero(np.argmax(infer(classifier,Zb),1) - np.argmax(Yb,1))
 
 			if not settings.quiet:
 				toc = time.time()
@@ -87,71 +85,61 @@ def epoch(X, Y, model, aug=None, cp=[]):
 
 print '-' * 80
 print 'Network and Dataset Loaded'
-print '-' * 55,; print time.ctime()
+print '-' * 55 + ' ' + time.ctime()
 
-## Pre-train
+## Training
 
-if settings.pretrain is not None:
+classifier = Linear(*lcarg)
+CI         = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c'] # CONV layers
 
-	if len(settings.pretrain) > 5 and not settings.pretrain[5]: disable(net, 'di')
+for n in xrange(settings.epoch):
 
-	ci   = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c']
-	pitr = int(settings.pretrain[0])
-	plen = XT.shape[0] * settings.pretrain[1]
-	preg = settings.pretrain[2]
-	pws  = True if settings.pretrain[3] == 1 else False
-	prat = settings.pretrain[4]
-
-	for i in xrange(pitr): # Iterations
-
-		XT, YT = shuffle(XT, YT)
-
-		for l in ci[::-1]: # Top-down Order
-
-			print 'Pre-training (Layer %d Iter %d)' % (l+1, i+1)
-
-			model = Linear(*arg)
-			epoch(XT[:plen], YT[:plen], model, cp=[l])
-			solve(model, preg)
-	
-			model.WZ = model.WZ[:-1] if bias_term else model.WZ
-			model.WZ = model.WZ.reshape(Zs + (-1,))
-			model.WZ = np.rollaxis(model.WZ, -1)
-	
-			pretrain(net, model.WZ, l, pws, prat)
-			print '-' * 55,; print time.ctime()
-
-		saveW(net, settings.save)
-
-enable (net, 'di')
-disable(net, 'dr') 
-
-## Train and Test
-
-model = Linear(*arg)
-
-for n in xrange(num_epoch):
-	
-	print 'Gathering SII/SIO (Epoch %d)' % (n+1)
+	print 'Running Epoch %d' % (n+1)
 
 	XT, YT = shuffle(XT, YT)
 
-	if n < 1: epoch(XT, YT, model)
-	else    : epoch(XT, YT, model, aug=aug) # Data Augmentation
+	for s in xrange(settings.lrnfreq):
 
-	print '-' * 55,; print time.ctime()
+		if len(settings.lrnrate) > 0: # Network (and Classifier) Training
 
-param = settings.regconst if not settings.lm else settings.lmconst
+			for l in CI[::-1]: # Top-down Order
 
-for p in xrange(len(param)):
+				print 'Training Layer %d (rate %.2f)' % (l+1, settings.lrnrate[0])
 
-	print 'Solving Linear Model (param = %.2f)' % param[p]
+				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, cp=[l]) # aug
+				solve(classifier, settings.lcparam[-1]) # using strongest smoothing
 
-	solve(model, param[p])
+				classifier.WZ = classifier.WZ[:-1] if settings.bias else classifier.WZ
+				classifier.WZ = classifier.WZ.reshape(Zs + (-1,))
+				classifier.WZ = np.rollaxis(classifier.WZ, -1)
 
-	print                     '||WZ||           = %e' % np.linalg.norm(model.WZ)
-	if settings.trnerr: print 'Training Error   = %d' % epoch(XT, YT, model)
-	if Xv.shape[0] > 0: print 'Validation Error = %d' % epoch(Xv, Yv, model)
-	if Xt.shape[0] > 0: print 'Test Error       = %d' % epoch(Xt, Yt, model)
+				train(net, classifier.WZ, l, settings.lrntied, settings.lrnrate[0])
+				saveW(net, settings.save)
 
-	print '-' * 55,; print time.ctime()
+				settings.lrnrate = settings.lrnrate[1:]
+				classifier = Linear(*lcarg) # new classifier since net changed
+
+		else: # Classifier Training
+
+			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=(None if n < 1 else aug))
+
+	#if len(settings.lrnrate) == 0: # Network Fixed
+
+	print '-' * 55 + ' ' + time.ctime()
+
+## Testing
+
+disable(net, 'dr')
+
+for p in xrange(len(settings.lcparam)):
+
+	print 'Testing Linear Classifier (p = %.2f)' % settings.lcparam[p]
+
+	solve(classifier, settings.lcparam[p])
+
+	print                     '||WZ||           = %e' % np.linalg.norm(classifier.WZ)
+	if settings.trnerr: print 'Training Error   = %d' % process(XT, YT, classifier, mode='test')
+	if Xv.shape[0] > 0: print 'Validation Error = %d' % process(Xv, Yv, classifier, mode='test')
+	if Xt.shape[0] > 0: print 'Test Error       = %d' % process(Xt, Yt, classifier, mode='test')
+
+	print '-' * 55 + ' ' + time.ctime()
