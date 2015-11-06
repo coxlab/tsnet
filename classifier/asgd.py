@@ -13,26 +13,26 @@ class Linear():
 		self.tWZ, self.tss = None, np.array(ss).astype('float32')
 		self. WZ, self. ss = None, np.ones(1)  .astype('float32')
 
-#@profile
 def update(model, Z, Y):
 
-	for i in xrange(Z.shape[0]):
+	if model.WZ is None:
 
-		if model.WZ is None:
+		model.tWZ  = np.zeros((Z.shape[1],Y.shape[1])).astype('float32')
+		model. WZ  = np.zeros((Z.shape[1],Y.shape[1])).astype('float32')
 
-			model.tWZ = np.zeros((Z.shape[1],Y.shape[1])).astype('float32')
-			model. WZ = np.zeros((Z.shape[1],Y.shape[1])).astype('float32')
+		#model.ss0 *= Z.shape[0]
+		#model.tss *= Z.shape[0]
  
-		M = np.dot(Z[i][None], model.tWZ) * Y[i][None]
-		I = M < 1
+	M = np.dot(Z, model.tWZ) * Y
+	I = M < 1
 
-		model.tWZ *= 1 - model.l2r * model.tss
-		model.tWZ += model.tss * I * Z[i][None].T * Y[i][None]
-		model. WZ  = (1 - model.ss) * model.WZ + model.ss * model.tWZ
+	model.tWZ *= 1 - model.l2r * model.tss
+	model.tWZ += model.tss * np.dot(Z.T, I * Y)
+	model. WZ  = (1 - model.ss) * model.WZ + model.ss * model.tWZ
 
-		model.t   += 1
-		model.tss  = model.ss0 / (1 + model.ss0 * model.l2r * model.t) ** (2.0/3)
-		model. ss  = 1.0 / model.t
+	model.t   += 1
+	model.tss  = model.ss0 / (1 + model.ss0 * model.l2r * model.t) ** (2.0/3)
+	model. ss  = 1.0 / model.t
 
 def solve(model, _):
 

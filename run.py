@@ -136,7 +136,10 @@ for n in xrange(settings.epoch):
 
 			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=(None if n < 1 else aug))
 
-	#if len(settings.lrnrate) == 0: # Network Fixed
+	if settings.peperr and classifier.WZ is not None:
+
+		if Xv.shape[0] > 0: print 'Validation Error = %d' % process(Xv, Yv, classifier, mode='test')
+		if Xt.shape[0] > 0: print 'Test Error       = %d' % process(Xt, Yt, classifier, mode='test')
 
 	print '-' * 55 + ' ' + time.ctime()
 

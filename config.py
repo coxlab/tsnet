@@ -21,6 +21,7 @@ parser.add_argument('-lc'     , type=int  , default=0                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
 parser.add_argument('-bias'   ,             action='store_true'          )
 
+parser.add_argument('-peperr',            action='store_true') # report error per epoch
 parser.add_argument('-trnerr',            action='store_true')
 parser.add_argument('-quiet' , '-q'     , action='store_true')
 parser.add_argument('-estmem', '-memest', action='store_true') # '-maxmem'
