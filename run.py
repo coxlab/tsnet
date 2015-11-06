@@ -1,29 +1,40 @@
 import math, sys, time
 import numpy as np
 import warnings; warnings.filterwarnings("ignore")
-from tools import *
 
-## Load Dataset & Network
+## Load Settings
 
 from config import *
 settings = parser.parse_args(); np.random.seed(settings.seed)
+# move estmem here
 
+print '-' * 55 + ' ' + time.ctime()
+
+## Load Network
+
+from tools import *
 net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
 
-exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
-#XT = XT[:100]; Xv = Xv[:100]; Xt = Xt[:100]
+## Load Dataset
 
+exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
 def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
-## Setup Parameters & Define Epoch
+if settings.fast:
+	if len(settings.fast) < 3: XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[0]]; Xt = Xt[:settings.fast[0]]
+	else                     : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]] 
 
-from core.network import *
+## Load Classifier
 
 if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lc]
 
-if   settings.lc == 0: from classifier.exact     import *; lcarg = ()
-elif settings.lc == 1: from classifier.lowrank   import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
-else                 : from classifier.asgd      import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+if   settings.lc == 0: from classifier.exact   import *; lcarg = ()
+elif settings.lc == 1: from classifier.lowrank import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
+else                 : from classifier.asgd    import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+
+## Define Epoch/Subepoch
+
+from core.network import *
 
 if settings.estmem:
 	
@@ -50,7 +61,8 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 	for i in xrange(0, X.shape[0], settings.batchsize):
 
 			if not settings.quiet:
-				print 'Processing Batch %d/%d' % (i/float(settings.batchsize) + 1, math.ceil(X.shape[0]/float(settings.batchsize))),
+				print 'Batch %d/%d' % (i/float(settings.batchsize) + 1, math.ceil(X.shape[0]/float(settings.batchsize))),
+				print '[Aug = 1;' if aug is not None else '[Aug = 0;',
 				tic = time.time()
 
 			Xb = X[i:i+settings.batchsize] # numpy fixes out-of-range access
@@ -63,7 +75,7 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 			Zb = Zb.reshape(Zb.shape[0], -1)
 
 			if not settings.quiet:
-				print '[Dim(Z) = {0}]'.format(str(Zs)), 
+				print 'Dim(Z) = %s;' % str(Zs), 
 
 			if settings.bias: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
@@ -72,7 +84,7 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
 			if not settings.quiet:
 				toc = time.time()
-				print '(%f Seconds)\r' % (toc - tic),
+				print 't = %f Sec]\r' % (toc - tic),
 				sys.stdout.flush()
 
 	if not settings.quiet:
@@ -81,10 +93,9 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
 	if mode == 'test': return err
 
-## Start Here
+## Start
 
-print '-' * 80
-print 'Network and Dataset Loaded'
+print 'Start'
 print '-' * 55 + ' ' + time.ctime()
 
 ## Training
@@ -94,7 +105,7 @@ CI         = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c'] # CONV laye
 
 for n in xrange(settings.epoch):
 
-	print 'Running Epoch %d' % (n+1)
+	print 'Epoch %d/%d' % (n+1, settings.epoch)
 
 	XT, YT = shuffle(XT, YT)
 
@@ -104,7 +115,7 @@ for n in xrange(settings.epoch):
 
 			for l in CI[::-1]: # Top-down Order
 
-				print 'Training Layer %d (rate %.2f)' % (l+1, settings.lrnrate[0])
+				print 'Subepoch %d/%d [Training Network Layer %d (Rate = %.2f)]' % (s+1, settings.lrnfreq, l+1, settings.lrnrate[0])
 
 				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, cp=[l]) # aug
 				solve(classifier, settings.lcparam[-1]) # using strongest smoothing
@@ -117,9 +128,11 @@ for n in xrange(settings.epoch):
 				saveW(net, settings.save)
 
 				settings.lrnrate = settings.lrnrate[1:]
-				classifier = Linear(*lcarg) # new classifier since net changed
+				classifier = Linear(*lcarg) # new classifier since net changed (or not?)
 
 		else: # Classifier Training
+
+			print 'Subepoch %d/%d [Training Classifier]' % (s+1, settings.lrnfreq)
 
 			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=(None if n < 1 else aug))
 
@@ -133,7 +146,7 @@ disable(net, 'dr')
 
 for p in xrange(len(settings.lcparam)):
 
-	print 'Testing Linear Classifier (p = %.2f)' % settings.lcparam[p]
+	print 'Testing Classifier (p = %.2f)' % settings.lcparam[p]
 
 	solve(classifier, settings.lcparam[p])
 

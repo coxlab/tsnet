@@ -1,3 +1,5 @@
+## Linear Classifier w/ "Rank Regularization" and Least Squares Loss
+
 import numpy as np
 from scipy.linalg import svd, eigh, qr
 from scipy.linalg.blas import ssyrk

@@ -1,3 +1,5 @@
+## Linear Classifier w/ L2 Regularization and Least Squares Loss (i.e. Ridge Regression)
+
 import numpy as np
 from scipy.linalg.blas import ssyrk
 from scipy.linalg.lapack import sposv
