@@ -1,6 +1,7 @@
 import numpy as np
-from skimage.util.shape import view_as_windows
 import numexpr as ne
+from skimage.util.shape import view_as_windows
+from numpy.lib.stride_tricks import as_strided
 
 # X: img, ch, y, x
 # Z: img, ch, y, x, (...)
@@ -13,6 +14,17 @@ def im2col(T, w):
 
 	return T
 
+DELAYED_EXPANSION = True
+
+def expansion(Z, n):
+
+	if Z.shape[1] == n: return Z
+
+	Zsh = list(Z.shape  ); Zsh[1] = n
+	Zst = list(Z.strides); Zst[1] = 0
+
+	return as_strided(Z, Zsh, Zst)
+
 #@profile
 def convolution(X, Z, W, B, s):
 
@@ -24,7 +36,7 @@ def convolution(X, Z, W, B, s):
 		Z = Z[:,:,::s[0],::s[1]]
 
 	X = np.tensordot(X.squeeze(1), W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
-	Z = np.repeat(Z, X.shape[1], 1)
+	Z = np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION else Z
 
 	if B is not None:
 		X = X + B.reshape(1,-1,1,1)
@@ -40,6 +52,8 @@ def maxpooling(X, Z, w, s):
 	if s is not None:
 		X = X[:,:,::s[0],::s[1]]
 		Z = Z[:,:,::s[0],::s[1]]
+
+	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
 
 	def indices(shape): # np.indices
 
@@ -60,8 +74,10 @@ def relu(X, Z):
 	I = X <= 0
 	X = ne.evaluate('where(I, 0, X)')
 
+	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+
 	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
-	Z = ne.evaluate('where(I, 0, Z)')
+	Z = ne.evaluate('where(I, 0, Z)', order='C')
 
 	return X, Z
 
@@ -71,8 +87,10 @@ def dropout(X, Z, r):
 	I = np.random.rand(*X.shape) < r
 	X = ne.evaluate('where(I, 0, X/(1-r))')
 
+	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+
 	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
-	Z = ne.evaluate('where(I, 0, Z/(1-r))')
+	Z = ne.evaluate('where(I, 0, Z/(1-r))', order='C')
 
 	return X, Z
 

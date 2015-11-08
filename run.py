@@ -60,10 +60,7 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
 	for i in xrange(0, X.shape[0], settings.batchsize):
 
-			if not settings.quiet:
-				print 'Batch %d/%d' % (i/float(settings.batchsize) + 1, math.ceil(X.shape[0]/float(settings.batchsize))),
-				print '[Aug = 1;' if aug is not None else '[Aug = 0;',
-				tic = time.time()
+			if not settings.quiet: t = time.time()
 
 			Xb = X[i:i+settings.batchsize] # numpy fixes out-of-range access
 			Yb = Y[i:i+settings.batchsize]
@@ -74,17 +71,18 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 			Zs = Zb.shape[1:]
 			Zb = Zb.reshape(Zb.shape[0], -1)
 
-			if not settings.quiet:
-				print 'Dim(Z) = %s;' % str(Zs), 
-
 			if settings.bias: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
 			if mode == 'train': update(classifier, Zb, Yb)
 			else              : err += np.count_nonzero(np.argmax(infer(classifier,Zb),1) - np.argmax(Yb,1))
 
 			if not settings.quiet:
-				toc = time.time()
-				print 't = %f Sec]\r' % (toc - tic),
+				t = float(time.time() - t)
+				print 'Batch %d/%d'       % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize))),
+				print '[Dim(%s) = %s;'    % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:])),
+				print 'Dim(Z) = %s;'      % str(Zs),
+				print 't = %.2f Sec'      % t,
+				print '(%.2f Img/Sec)]\r' % (Xb.shape[0] / t),
 				sys.stdout.flush()
 
 	if not settings.quiet:
@@ -103,6 +101,8 @@ print '-' * 55 + ' ' + time.ctime()
 classifier = Linear(*lcarg)
 CI         = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c'] # CONV layers
 
+disable(net, 'dr') # disable dropout and only turn on when training CONV layers
+
 for n in xrange(settings.epoch):
 
 	print 'Epoch %d/%d' % (n+1, settings.epoch)
@@ -112,6 +112,8 @@ for n in xrange(settings.epoch):
 	for s in xrange(settings.lrnfreq):
 
 		if len(settings.lrnrate) > 0: # Network (and Classifier) Training
+
+			enable(net, 'dr')
 
 			for l in CI[::-1]: # Top-down Order
 
@@ -130,6 +132,8 @@ for n in xrange(settings.epoch):
 				settings.lrnrate = settings.lrnrate[1:]
 				classifier = Linear(*lcarg) # new classifier since net changed (or not?)
 
+			disable(net, 'dr')
+
 		else: # Classifier Training
 
 			print 'Subepoch %d/%d [Training Classifier]' % (s+1, settings.lrnfreq)
@@ -138,14 +142,12 @@ for n in xrange(settings.epoch):
 
 	if settings.peperr and classifier.WZ is not None:
 
-		if Xv.shape[0] > 0: print 'Validation Error = %d' % process(Xv, Yv, classifier, mode='test')
-		if Xt.shape[0] > 0: print 'Test Error       = %d' % process(Xt, Yt, classifier, mode='test')
+		if Xv.shape[0] > 0: print 'VAL Error = %d' % process(Xv, Yv, classifier, mode='test')
+		if Xt.shape[0] > 0: print 'TST Error = %d' % process(Xt, Yt, classifier, mode='test')
 
 	print '-' * 55 + ' ' + time.ctime()
 
 ## Testing
-
-disable(net, 'dr')
 
 for p in xrange(len(settings.lcparam)):
 
@@ -153,9 +155,9 @@ for p in xrange(len(settings.lcparam)):
 
 	solve(classifier, settings.lcparam[p])
 
-	print                     '||WZ||           = %e' % np.linalg.norm(classifier.WZ)
-	if settings.trnerr: print 'Training Error   = %d' % process(XT, YT, classifier, mode='test')
-	if Xv.shape[0] > 0: print 'Validation Error = %d' % process(Xv, Yv, classifier, mode='test')
-	if Xt.shape[0] > 0: print 'Test Error       = %d' % process(Xt, Yt, classifier, mode='test')
+	print                     '||WZ||    = %e' % np.linalg.norm(classifier.WZ)
+	if settings.trnerr: print 'TRN Error = %d' % process(XT, YT, classifier, mode='test')
+	if Xv.shape[0] > 0: print 'VAL Error = %d' % process(Xv, Yv, classifier, mode='test')
+	if Xt.shape[0] > 0: print 'TST Error = %d' % process(Xt, Yt, classifier, mode='test')
 
 	print '-' * 55 + ' ' + time.ctime()
