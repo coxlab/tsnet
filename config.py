@@ -7,7 +7,7 @@ LC_DEFAULT      = [EXACT_DEFAULT, LOWRANK_DEFAULT, ASGD_DEFAULT]
 
 import argparse; parser = argparse.ArgumentParser()
 
-parser.add_argument('-network', default=['mnist_1l'], nargs='*') # p:3,3,3,3 c:55,1,7,7/0/1,1 m:7,7/7,7 di:25/1
+parser.add_argument('-network', default=['mnist_1l'], nargs='*') # padd:3,3,3,3 conv:55,1,7,7/0/1,1 mpol:7,7/7,7 dred:25/1
 parser.add_argument('-dataset', default='mnist')
 
 parser.add_argument('-batchsize', type=int, default=50)
@@ -21,14 +21,14 @@ parser.add_argument('-lc'     , type=int  , default=0                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
 parser.add_argument('-bias'   ,             action='store_true'          )
 
-parser.add_argument('-peperr',            action='store_true') # report error per epoch
-parser.add_argument('-trnerr',            action='store_true')
-parser.add_argument('-quiet' , '-q'     , action='store_true')
-parser.add_argument('-estmem', '-memest', action='store_true') # '-maxmem'
+parser.add_argument('-peperr', action='store_true') # report error per epoch
+parser.add_argument('-trnerr', action='store_true')
+parser.add_argument('-quiet' , action='store_true')
+parser.add_argument('-memest', action='store_true') # '-memmax'
 
-parser.add_argument('-seed',       type=int, default=0            )
-parser.add_argument('-save',                 default=''           ) # save Ws to filename
-parser.add_argument('-fast', '-f', type=int, default=[], nargs='*') # fast run with fewer data points
+parser.add_argument('-seed', type=int, default=0            )
+parser.add_argument('-save',           default=''           ) # save Ws to filename
+parser.add_argument('-fast', type=int, default=[], nargs='*') # fast run with fewer data points
 
 ## Network Initialization
 
@@ -49,8 +49,8 @@ def netinit(netspec, ds=None):
 			ls = netspec[l].replace('/',':').split(':')
 
 			net     += [[]]
-			net[-1] += [ls[0]] # type
-			net[-1] += [True]  # enable
+			net[-1] += [ls[0].upper()] # type
+			net[-1] += [True]          # enable
 			
 			for p in xrange(1,len(ls)): # parameters
 
@@ -62,13 +62,13 @@ def netinit(netspec, ds=None):
 		# Generate W (and B, though useless) for CONV and REDIM
 		for l in xrange(len(netspec)):
 
-			if net[l][TYPE][:1] == 'c':
+			if net[l][TYPE] == 'CONV':
 
 				net[l][PARAM  ] = np.random.randn(*net[l][PARAM]).astype('float32') # W
 				net[l][PARAM+1] = np.zeros(net[l][PARAM].shape[0]).astype('float32') if net[l][PARAM+1] == 1 else None # B
 				d               = l
 			
-			elif net[l][TYPE][:2] == 'di':
+			elif net[l][TYPE] == 'DRED':
 
 				if len(net[l]) <= PARAM+1: # Random Bases
 

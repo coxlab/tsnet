@@ -3,9 +3,7 @@ import numexpr as ne
 from skimage.util.shape import view_as_windows
 from numpy.lib.stride_tricks import as_strided
 
-# X: img, ch, y, x
-# Z: img, ch, y, x, (...)
-# W: cho, chi, wy, wx
+## Tools
 
 def im2col(T, w):
 
@@ -13,8 +11,6 @@ def im2col(T, w):
 	T = T.transpose(range(4) + range(T.ndim-4, T.ndim) + range(4, T.ndim-4))
 
 	return T
-
-DELAYED_EXPANSION = True
 
 def expansion(Z, n):
 
@@ -24,6 +20,20 @@ def expansion(Z, n):
 	Zst = list(Z.strides); Zst[1] = 0
 
 	return as_strided(Z, Zsh, Zst)
+
+def indices(shape): # memory efficient np.indices
+
+	I = ()
+	for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
+	return I
+
+## Layers
+
+DELAYED_EXPANSION = True
+
+# X: img, ch, y, x
+# Z: img, ch, y, x, (...)
+# W: cho, chi, wy, wx
 
 #@profile
 def convolution(X, Z, W, B, s):
@@ -55,12 +65,6 @@ def maxpooling(X, Z, w, s):
 
 	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
 
-	def indices(shape): # np.indices
-
-		I = ()
-		for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
-		return I
-
 	I = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(w))
 
 	X = X[I]
@@ -69,12 +73,27 @@ def maxpooling(X, Z, w, s):
 	return X, Z
 
 #@profile
-def relu(X, Z):
-
-	I = X <= 0
-	X = ne.evaluate('where(I, 0, X)')
+def maxout(X, Z, w):
 
 	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+
+	X = im2col(X, (1,w,1,1)).squeeze((4,6,7))[:,::w]
+	Z = im2col(Z, (1,w,1,1)).squeeze((4,6,7))[:,::w]
+
+	I = indices(X.shape[:-1]) + (np.argmax(X, -1),)
+
+	X = X[I]
+	Z = Z[I]
+
+	return X, Z
+
+#@profile
+def relu(X, Z):
+
+	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+
+	I = X <= 0
+	X = ne.evaluate('where(I, 0, X)', order='C')
 
 	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
 	Z = ne.evaluate('where(I, 0, Z)', order='C')
@@ -84,10 +103,10 @@ def relu(X, Z):
 #@profile
 def dropout(X, Z, r):
 
-	I = np.random.rand(*X.shape) < r
-	X = ne.evaluate('where(I, 0, X/(1-r))')
-
 	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+
+	I = np.random.rand(*X.shape) < r
+	X = ne.evaluate('where(I, 0, X/(1-r))', order='C')
 
 	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
 	Z = ne.evaluate('where(I, 0, Z/(1-r))', order='C')

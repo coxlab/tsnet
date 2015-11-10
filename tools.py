@@ -12,6 +12,6 @@ def saveW(net, fn):
 
 	for l in xrange(len(net)):
 
-		if net[l][TYPE][:1] == 'c': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = net[l][PARAM]
+		if net[l][TYPE] == 'CONV': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = net[l][PARAM]
 
 	savemat(fn, {'W':W}, appendmat=False)

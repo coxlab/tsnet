@@ -36,9 +36,9 @@ else                 : from classifier.asgd    import *; lcarg = tuple(settings.
 
 from core.network import *
 
-if settings.estmem:
+if settings.memest:
 	
-	Ztmp = forward(net, np.zeros_like(XT[:bsiz]))
+	Ztmp = forward(net, np.zeros_like(XT[:settings.batchsize]))
 	Zdim = np.prod(Ztmp.shape[1:]) + int(settings.bias)
 
 	usage  = XT.nbytes + YT.nbytes     # dataset
@@ -99,9 +99,9 @@ print '-' * 55 + ' ' + time.ctime()
 ## Training
 
 classifier = Linear(*lcarg)
-CI         = [i for i in xrange(len(net)) if net[i][TYPE][0] == 'c'] # CONV layers
+CI         = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV'] # CONV layers
 
-disable(net, 'dr') # disable dropout and only turn on when training CONV layers
+disable(net, 'DOUT') # disable dropout and only turn on when training CONV layers
 
 for n in xrange(settings.epoch):
 
@@ -113,7 +113,7 @@ for n in xrange(settings.epoch):
 
 		if len(settings.lrnrate) > 0: # Network (and Classifier) Training
 
-			enable(net, 'dr')
+			enable(net, 'DOUT')
 
 			for l in CI[::-1]: # Top-down Order
 
@@ -132,7 +132,7 @@ for n in xrange(settings.epoch):
 				settings.lrnrate = settings.lrnrate[1:]
 				classifier = Linear(*lcarg) # new classifier since net changed (or not?)
 
-			disable(net, 'dr')
+			disable(net, 'DOUT')
 
 		else: # Classifier Training
 
@@ -140,7 +140,7 @@ for n in xrange(settings.epoch):
 
 			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=(None if n < 1 else aug))
 
-	if settings.peperr and classifier.WZ is not None:
+	if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
 
 		if Xv.shape[0] > 0: print 'VAL Error = %d' % process(Xv, Yv, classifier, mode='test')
 		if Xt.shape[0] > 0: print 'TST Error = %d' % process(Xt, Yt, classifier, mode='test')

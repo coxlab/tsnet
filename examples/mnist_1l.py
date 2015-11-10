@@ -20,8 +20,8 @@ V = V[:,:,:,None,None,:]
 
 net = []
 
-net += [[]]; net[-1] += ['pad'];     net[-1] += [True]; net[-1] += [[3,3,3,3]];
-net += [[]]; net[-1] += ['conv'];    net[-1] += [True]; net[-1] += [W];         net[-1] += [B];     net[-1] += [None];
-net += [[]]; net[-1] += ['maxpool']; net[-1] += [True]; net[-1] += [[7,7]];     net[-1] += [[7,7]];
-net += [[]]; net[-1] += ['dimredc']; net[-1] += [True]; net[-1] += [V];
+net += [[]]; net[-1] += ['PADD']; net[-1] += [True]; net[-1] += [[3,3,3,3]];
+net += [[]]; net[-1] += ['CONV']; net[-1] += [True]; net[-1] += [W];         net[-1] += [B];     net[-1] += [None];
+net += [[]]; net[-1] += ['MPOL']; net[-1] += [True]; net[-1] += [[7,7]];     net[-1] += [[7,7]];
+net += [[]]; net[-1] += ['DRED']; net[-1] += [True]; net[-1] += [V];
 
