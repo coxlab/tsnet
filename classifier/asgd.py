@@ -4,11 +4,12 @@ import numpy as np
 
 class Linear():
 
-	def __init__(self, l2r, ss): 
+	def __init__(self, l2r, ss, t0): 
 
 		self.l2r = np.array(l2r).astype('float32')
 		self.ss0 = np.array(ss) .astype('float32') 
 		self.t   = np.zeros(1)  .astype('float32')
+		self.t0  = np.array(t0) .astype('float32')
 
 		self.tWZ, self.tss = None, np.array(ss).astype('float32')
 		self. WZ, self. ss = None, np.ones(1)  .astype('float32')
@@ -32,7 +33,7 @@ def update(model, Z, Y):
 
 	model.t   += 1
 	model.tss  = model.ss0 / (1 + model.ss0 * model.l2r * model.t) ** (2.0/3)
-	model. ss  = 1.0 / model.t
+	model. ss  = 1.0 / max(model.t - model.t0, np.ones(1).astype('float32'))
 
 def solve(model, _):
 

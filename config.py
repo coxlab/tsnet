@@ -2,7 +2,7 @@
 
 EXACT_DEFAULT   = [2.0, 2.5, 3.0, 3.5, 4.0]
 LOWRANK_DEFAULT = [500, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5]
-ASGD_DEFAULT    = [1e-3, 1e-2]
+ASGD_DEFAULT    = [1e-3, 1e-2, 0]
 LC_DEFAULT      = [EXACT_DEFAULT, LOWRANK_DEFAULT, ASGD_DEFAULT]
 
 import argparse; parser = argparse.ArgumentParser()
@@ -12,15 +12,16 @@ parser.add_argument('-dataset', default='mnist')
 
 parser.add_argument('-batchsize', type=int, default=50)
 
-parser.add_argument('-epoch'  , type=int  , default=1            )
-parser.add_argument('-lrnfreq', type=int  , default=1            ) # learn N times per epoch until no more rate specified
-parser.add_argument('-lrnrate', type=float, default=[], nargs='*') # 0.5
-parser.add_argument('-lrntied',             action='store_true'  )
+parser.add_argument('-epoch'  , type=int, default=1            )
+parser.add_argument('-lrnfreq', type=int, default=1            ) # learn N times per epoch until no more rate specified
+parser.add_argument('-lrnrate',           default=[], nargs='*') # 0.5
+parser.add_argument('-lrntied',           action='store_true'  )
 
 parser.add_argument('-lc'     , type=int  , default=0                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
 parser.add_argument('-bias'   ,             action='store_true'          )
 
+parser.add_argument('-noaug' , action='store_true')
 parser.add_argument('-peperr', action='store_true') # report error per epoch
 parser.add_argument('-trnerr', action='store_true')
 parser.add_argument('-quiet' , action='store_true')
@@ -54,7 +55,7 @@ def netinit(netspec, ds=None):
 			
 			for p in xrange(1,len(ls)): # parameters
 
-				try:    net[-1] += [[int(n)   for n in ls[p].split(',')]]
+				try   : net[-1] += [[int(n)   for n in ls[p].split(',')]]
 				except: net[-1] += [[float(n) for n in ls[p].split(',')]]
 
 				if len(net[-1][-1]) == 1: net[-1][-1] = net[-1][-1][0]
@@ -94,3 +95,11 @@ def netinit(netspec, ds=None):
 
 	return net
 
+def evalparam(param):
+
+	for i in xrange(len(param)):
+
+		try   : param[i] = [float(param[i])]
+		except: param[i] = eval('np.' + param[i])
+
+	return [p for P in param for p in P]

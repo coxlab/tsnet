@@ -24,6 +24,8 @@ if settings.fast:
 	if len(settings.fast) < 3: XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[0]]; Xt = Xt[:settings.fast[0]]
 	else                     : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]] 
 
+if settings.noaug: aug = None
+
 ## Load Classifier
 
 if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lc]
@@ -83,7 +85,7 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 				print 'Dim(Z) = %s;'      % str(Zs),
 				print 't = %.2f Sec'      % t,
 				print '(%.2f Img/Sec)]\r' % (Xb.shape[0] / t),
-				sys.stdout.flush()
+				#sys.stdout.flush()
 
 	if not settings.quiet:
 		sys.stdout.write("\033[K") # clear line (may not be safe)
@@ -98,8 +100,9 @@ print '-' * 55 + ' ' + time.ctime()
 
 ## Training
 
-classifier = Linear(*lcarg)
-CI         = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV'] # CONV layers
+classifier       = Linear(*lcarg)
+CI               = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV'] # CONV layers
+settings.lrnrate = evalparam(settings.lrnrate)
 
 disable(net, 'DOUT') # disable dropout and only turn on when training CONV layers
 
