@@ -20,6 +20,7 @@ parser.add_argument('-lrntied',           action='store_true'  )
 parser.add_argument('-lc'     , type=int  , default=0                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
 parser.add_argument('-bias'   ,             action='store_true'          )
+parser.add_argument('-ovo'    ,             action='store_true'          )
 
 parser.add_argument('-noaug' , action='store_true')
 parser.add_argument('-peperr', action='store_true') # report error per epoch
@@ -79,7 +80,7 @@ def netinit(netspec, ds=None):
 
 				else: # PCA Bases
 
-					net[l][PARAM] = loadmat('datasets/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
+					net[l][PARAM] = loadmat('datasets/bases/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
 					net[l][PARAM] = net[l][PARAM].transpose(1,2,3,0)[:,:,:,None,None,:]
 
 					if net[l][PARAM+1] == 1: # Reinitialize W of CONV with PCA Bases

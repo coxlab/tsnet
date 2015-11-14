@@ -17,7 +17,7 @@ net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
 
 ## Load Dataset
 
-exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, aug' % settings.dataset
+exec 'from datasets.%s import XT, YT, Xv, Yv, Xt, Yt, NC, aug' % settings.dataset
 def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
 if settings.fast:
@@ -33,6 +33,9 @@ if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lc]
 if   settings.lc == 0: from classifier.exact   import *; lcarg = ()
 elif settings.lc == 1: from classifier.lowrank import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
 else                 : from classifier.asgd    import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+
+if settings.ovo: from classifier.formatting import ovo; enc, dec = ovo()
+else           : from classifier.formatting import ovr; enc, dec = ovr()
 
 ## Define Epoch/Subepoch
 
@@ -75,8 +78,8 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
 			if settings.bias: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
-			if mode == 'train': update(classifier, Zb, Yb)
-			else              : err += np.count_nonzero(np.argmax(infer(classifier,Zb),1) - np.argmax(Yb,1))
+			if mode == 'train': update(classifier, Zb, enc(Yb, NC))
+			else              : err += np.count_nonzero(dec(infer(classifier, Zb), NC) != Yb)
 
 			if not settings.quiet:
 				t = float(time.time() - t)

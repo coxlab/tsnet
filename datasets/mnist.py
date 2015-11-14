@@ -3,7 +3,12 @@
 import numpy as np
 import os, cPickle
 
-(XT, YT), (Xt, Yt) = cPickle.load(open(os.path.dirname(__file__)+'/mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
+dsdir  = os.path.dirname(__file__)
+dsdir += '/' if dsdir else ''
+
+NC = 10
+
+(XT, YT), (Xt, Yt) = cPickle.load(open(dsdir+'mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
 
 #Xv = np.array([]); Yv = np.array([])
 Xv = XT[50000:];   Yv = YT[50000:]
@@ -17,17 +22,6 @@ Xm = np.mean(XT, 0)[None,:,:,:]
 XT = XT - Xm
 Xv = Xv - Xm
 Xt = Xt - Xm
-
-def categorical(Y):
-
-        #YN = np.zeros((Y.shape[0], np.amax(Y)+1)).astype('float32')
-	YN = -np.ones((Y.shape[0], np.amax(Y)+1)).astype('float32')
-        YN[np.indices(Y.shape), Y] = 1
-        return YN
-
-YT = categorical(YT)
-Yv = categorical(Yv)
-Yt = categorical(Yt)
 
 if __name__ != '__main__':
 
@@ -44,10 +38,11 @@ else:
 	from scipy.linalg.blas import ssyrk
 	from scipy.linalg import eigh
 	from scipy.io import savemat
+	from distutils.dir_util import mkpath; mkpath(dsdir + 'bases')
 
 	for rfs in xrange(3, 11+1):
 
-		fn = os.path.dirname(__file__) + '/mnist_pc_rf%d.mat' % rfs
+		fn = dsdir + 'bases/mnist_pc_rf%d.mat' % rfs
 
 		if not os.path.isfile(fn):
 
