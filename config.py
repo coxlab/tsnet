@@ -20,7 +20,7 @@ parser.add_argument('-lrntied',           action='store_true'  )
 parser.add_argument('-lc'     , type=int  , default=0                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
 parser.add_argument('-bias'   ,             action='store_true'          )
-parser.add_argument('-ovo'    ,             action='store_true'          )
+parser.add_argument('-mc'     , type=int  , default=0                    )
 
 parser.add_argument('-noaug' , action='store_true')
 parser.add_argument('-peperr', action='store_true') # report error per epoch
@@ -67,7 +67,7 @@ def netinit(netspec, ds=None):
 			if net[l][TYPE] == 'CONV':
 
 				net[l][PARAM  ] = np.random.randn(*net[l][PARAM]).astype('float32') # W
-				net[l][PARAM+1] = np.zeros(net[l][PARAM].shape[0]).astype('float32') if net[l][PARAM+1] == 1 else None # B
+				net[l][PARAM+1] = np.zeros(net[l][PARAM].shape[0], dtype='float32') if net[l][PARAM+1] == 1 else None # B
 				d               = l
 			
 			elif net[l][TYPE] == 'DRED':

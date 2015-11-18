@@ -34,8 +34,9 @@ if   settings.lc == 0: from classifier.exact   import *; lcarg = ()
 elif settings.lc == 1: from classifier.lowrank import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
 else                 : from classifier.asgd    import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
-if settings.ovo: from classifier.formatting import ovo; enc, dec = ovo()
-else           : from classifier.formatting import ovr; enc, dec = ovr()
+if   settings.mc == 0: from classifier.formatting import ovr ; enc, dec = ovr ()
+elif settings.mc == 1: from classifier.formatting import ovo ; enc, dec = ovo ()
+else                 : from classifier.formatting import ecoc; enc, dec = ecoc()
 
 ## Define Epoch/Subepoch
 
