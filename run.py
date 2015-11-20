@@ -134,10 +134,10 @@ for n in xrange(settings.epoch):
 				classifier.WZ = np.rollaxis(classifier.WZ, -1)
 
 				train(net, classifier.WZ, l, settings.lrntied, settings.lrnrate[0])
-				saveW(net, settings.save)
-
-				settings.lrnrate = settings.lrnrate[1:]
 				classifier = Linear(*lcarg) # new classifier since net changed (or not?)
+
+			saveW(net, settings.save)
+			settings.lrnrate = settings.lrnrate[1:]
 
 			disable(net, 'DOUT')
 

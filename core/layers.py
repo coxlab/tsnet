@@ -104,6 +104,7 @@ def relu(X, Z):
 def dropout(X, Z, r):
 
 	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+	r = np.array(r).astype('float32')
 
 	I = np.random.rand(*X.shape) < r
 	X = ne.evaluate('where(I, 0, X/(1-r))', order='C')
