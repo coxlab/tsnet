@@ -28,11 +28,12 @@ def update(model, Z, Y):
 		model.tWZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
 		model. WZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
 		model.cch = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
+		model.tif = np.zeros((Z.shape[0],Y.shape[1]), dtype='float32')
 
 		#model.ss0 *= Z.shape[0]
 		#model.tss *= Z.shape[0]
 
-	D = np.dot(Z, model.tWZ) * Y
+	D = np.dot(Z, model.tWZ, out=model.tif) * Y
 	D = (D < 1) * Y
 
 	#model.tWZ *= 1 - model.tss * model.l2r

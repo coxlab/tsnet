@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import math, sys, time
 import numpy as np
 import warnings; warnings.filterwarnings("ignore")
@@ -8,7 +10,7 @@ from config import *
 settings = parser.parse_args(); np.random.seed(settings.seed)
 # move estmem here
 
-print '-' * 55 + ' ' + time.ctime()
+print('-' * 55 + ' ' + time.ctime())
 
 ## Load Network
 
@@ -34,6 +36,8 @@ if   settings.lc == 0: from classifier.exact   import *; lcarg = ()
 elif settings.lc == 1: from classifier.lowrank import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
 else                 : from classifier.asgd    import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
+settings.peperr &= (settings.lc == 2)
+
 if   settings.mc == 0: from classifier.formatting import ovr ; enc, dec = ovr ()
 elif settings.mc == 1: from classifier.formatting import ovo ; enc, dec = ovo ()
 else                 : from classifier.formatting import ecoc; enc, dec = ecoc()
@@ -42,33 +46,18 @@ else                 : from classifier.formatting import ecoc; enc, dec = ecoc()
 
 from core.network import *
 
-if settings.memest:
-	
-	Ztmp = forward(net, np.zeros_like(XT[:settings.batchsize]))
-	Zdim = np.prod(Ztmp.shape[1:]) + int(settings.bias)
-
-	usage  = XT.nbytes + YT.nbytes     # dataset
-	usage += Xv.nbytes + Yv.nbytes
-	usage += Xt.nbytes + Yt.nbytes
-	usage += Zdim * settings.batchsize * 4 # batch
-	usage += Zdim ** 2 * 4 + Zdim * 4  # SII + cache
-	usage += Zdim * YT.shape[1] * 2    # SIO + WZ
-
-	print 'Estimated Memory Usage: %d MB' % math.ceil(usage / 1024**2)
-	sys.exit()
-
 Zs = ()
 
 #@profile
 def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
-	global Zs; err = 0
+	global Zs; smp = err = 0
 
 	for i in xrange(0, X.shape[0], settings.batchsize):
 
 			if not settings.quiet: t = time.time()
 
-			Xb = X[i:i+settings.batchsize] # numpy fixes out-of-range access
+			Xb = X[i:i+settings.batchsize]; smp += Xb.shape[0]
 			Yb = Y[i:i+settings.batchsize]
 
 			Xb = aug(Xb) if aug is not None else Xb
@@ -79,28 +68,30 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 
 			if settings.bias: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
 			
-			if mode == 'train': update(classifier, Zb, enc(Yb, NC))
-			else              : err += np.count_nonzero(dec(infer(classifier, Zb), NC) != Yb)
+			if mode == 'train': update(classifier, Zb, enc(Yb, NC)) 
+
+			if mode == 'test'   : err += np.count_nonzero(dec(infer(classifier, Zb), NC) != Yb)
+			elif settings.peperr: err += np.count_nonzero(dec(classifier.tif       , NC) != Yb)
 
 			if not settings.quiet:
-				t = float(time.time() - t)
-				print 'Batch %d/%d'       % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize))),
-				print '[Dim(%s) = %s;'    % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:])),
-				print 'Dim(Z) = %s;'      % str(Zs),
-				print 't = %.2f Sec'      % t,
-				print '(%.2f Img/Sec)]\r' % (Xb.shape[0] / t),
-				#sys.stdout.flush()
+				t    = float(time.time() - t)
+				msg  = 'Batch %d/%d '   % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
+				msg += '['
+				#msg += 'Dim(%s) = %s; ' % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:]))
+				#msg += 'Dim(Z) = %s; '  % str(Zs)
+				msg += 'ER = %e; '      % (float(err) / smp) if mode == 'train' and settings.peperr else ''
+				msg += 't = %.2f Sec '  % t
+				msg += '(%.2f Img/Sec)' % (Xb.shape[0] / t)
+				msg += ']'
+				print(msg, end='\r'); #sys.stdout.flush()
 
-	if not settings.quiet:
-		sys.stdout.write("\033[K") # clear line (may not be safe)
-		#print '\n',
-
-	if mode == 'test': return err
+	if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
+	return err
 
 ## Start
 
-print 'Start'
-print '-' * 55 + ' ' + time.ctime()
+print('Start')
+print('-' * 55 + ' ' + time.ctime())
 
 ## Training
 
@@ -112,7 +103,7 @@ disable(net, 'DOUT') # disable dropout and only turn on when training CONV layer
 
 for n in xrange(settings.epoch):
 
-	print 'Epoch %d/%d' % (n+1, settings.epoch)
+	print('Epoch %d/%d' % (n+1, settings.epoch))
 
 	XT, YT = shuffle(XT, YT)
 
@@ -124,17 +115,15 @@ for n in xrange(settings.epoch):
 
 			for l in CI[::-1]: # Top-down Order
 
-				print 'Subepoch %d/%d [Training Network Layer %d (Rate = %.2f)]' % (s+1, settings.lrnfreq, l+1, settings.lrnrate[0])
+				print('Subepoch %d/%d [Training Network Layer %d (Rate = %.2f)]' % (s+1, settings.lrnfreq, l+1, settings.lrnrate[0]))
 
-				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, cp=[l]) # aug
+				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, cp=[l], aug=aug)
 				solve(classifier, settings.lcparam[-1]) # using strongest smoothing
 
-				classifier.WZ = classifier.WZ[:-1] if settings.bias else classifier.WZ
-				classifier.WZ = classifier.WZ.reshape(Zs + (-1,))
-				classifier.WZ = np.rollaxis(classifier.WZ, -1)
+				def unflatten(WZ): return np.rollaxis(np.reshape(WZ[:-1] if settings.bias else WZ, Zs + (-1,)), -1)
 
-				train(net, classifier.WZ, l, settings.lrntied, settings.lrnrate[0])
-				classifier = Linear(*lcarg) # new classifier since net changed (or not?)
+				train(net, unflatten(classifier.WZ), l, settings.lrntied, settings.lrnrate[0])
+				#classifier = Linear(*lcarg) # new classifier since net changed (or not?)
 
 			saveW(net, settings.save)
 			settings.lrnrate = settings.lrnrate[1:]
@@ -143,28 +132,28 @@ for n in xrange(settings.epoch):
 
 		else: # Classifier Training
 
-			print 'Subepoch %d/%d [Training Classifier]' % (s+1, settings.lrnfreq)
+			print('Subepoch %d/%d [Training Classifier]' % (s+1, settings.lrnfreq))
 
-			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=(None if n < 1 else aug))
+			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=aug)
 
 	if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
 
-		if Xv.shape[0] > 0: print 'VAL Error = %d' % process(Xv, Yv, classifier, mode='test')
-		if Xt.shape[0] > 0: print 'TST Error = %d' % process(Xt, Yt, classifier, mode='test')
+		if Xv.shape[0] > 0: print('VAL Error = %d' % process(Xv, Yv, classifier, mode='test'))
+		if Xt.shape[0] > 0: print('TST Error = %d' % process(Xt, Yt, classifier, mode='test'))
 
-	print '-' * 55 + ' ' + time.ctime()
+	print('-' * 55 + ' ' + time.ctime())
 
 ## Testing
 
 for p in xrange(len(settings.lcparam)):
 
-	print 'Testing Classifier (p = %.2f)' % settings.lcparam[p]
+	print('Testing Classifier (p = %.2f)' % settings.lcparam[p])
 
 	solve(classifier, settings.lcparam[p])
 
-	print                     '||WZ||    = %e' % np.linalg.norm(classifier.WZ)
-	if settings.trnerr: print 'TRN Error = %d' % process(XT, YT, classifier, mode='test')
-	if Xv.shape[0] > 0: print 'VAL Error = %d' % process(Xv, Yv, classifier, mode='test')
-	if Xt.shape[0] > 0: print 'TST Error = %d' % process(Xt, Yt, classifier, mode='test')
+	print(                    '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
+	if settings.trnerr: print('TRN Error = %d' % process(XT, YT, classifier, mode='test'))
+	if Xv.shape[0] > 0: print('VAL Error = %d' % process(Xv, Yv, classifier, mode='test'))
+	if Xt.shape[0] > 0: print('TST Error = %d' % process(Xt, Yt, classifier, mode='test'))
 
-	print '-' * 55 + ' ' + time.ctime()
+	print('-' * 55 + ' ' + time.ctime())
