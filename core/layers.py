@@ -31,12 +31,11 @@ def indices(shape): # memory efficient np.indices
 
 DELAYED_EXPANSION = True
 
-# X: img, ch, y, x
-# Z: img, ch, y, x, (...)
-# W: cho, chi, wy, wx
+Xe = []
+def getXe(): return Xe
 
 #@profile
-def convolution(X, Z, W, B, s):
+def convolution(X, Z, W, s):
 
 	X = im2col(X, (1,)+W.shape[1:]).squeeze(4)
 	Z = im2col(Z, (1,)+W.shape[1:]).squeeze(4)
@@ -45,11 +44,12 @@ def convolution(X, Z, W, B, s):
 		X = X[:,:,::s[0],::s[1]]
 		Z = Z[:,:,::s[0],::s[1]]
 
+	global Xe; Xe = X
+
 	X = np.tensordot(X.squeeze(1), W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
 	Z = np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION else Z
 
-	if B is not None:
-		X = X + B.reshape(1,-1,1,1)
+	#if B is not None: X = X + B.reshape(1,-1,1,1)
 
 	return X, Z
 

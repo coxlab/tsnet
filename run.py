@@ -16,6 +16,7 @@ print('-' * 55 + ' ' + time.ctime())
 
 from tools import *
 net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
+CI = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV'] # CONV layers
 
 ## Load Dataset
 
@@ -49,7 +50,7 @@ from core.network import *
 Zs = ()
 
 #@profile
-def process(X, Y, classifier, mode='train', aug=None, cp=[]):
+def process(X, Y, model, mode='train', aug=None, cp=[], net=net):
 
 	global Zs; smp = err = 0
 
@@ -63,22 +64,21 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 			Xb = aug(Xb) if aug is not None else Xb
 
 			Zb = forward(net, Xb, cp)
-			Zs = Zb.shape[1:]
-			Zb = Zb.reshape(Zb.shape[0], -1)
+			Zs = Zb.shape[1:]                if mode != 'pretrain' else Zb.shape[-3:]
+			Zb = Zb.reshape(Zb.shape[0], -1) if mode != 'pretrain' else Zb.reshape(-1, np.prod(Zs))
 
-			if settings.bias: Zb = np.pad(Zb, ((0,0),(0,1)), 'constant', constant_values=(1.0,))
-			
-			if mode == 'train': update(classifier, Zb, enc(Yb, NC)) 
+			if   mode == 'pretrain': model = pretrain(None, Zb, Zs, model)
+			elif mode == 'train'   : update(model, Zb, enc(Yb, NC))
+			elif mode == 'test'    : err += np.count_nonzero(dec(infer(model, Zb), NC) != Yb)
 
-			if mode == 'test'   : err += np.count_nonzero(dec(infer(classifier, Zb), NC) != Yb)
-			elif settings.peperr: err += np.count_nonzero(dec(classifier.tif       , NC) != Yb)
+			if mode == 'train' and settings.peperr: err += np.count_nonzero(dec(model.tif, NC) != Yb)
 
 			if not settings.quiet:
 				t    = float(time.time() - t)
 				msg  = 'Batch %d/%d '   % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
 				msg += '['
-				#msg += 'Dim(%s) = %s; ' % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:]))
-				#msg += 'Dim(Z) = %s; '  % str(Zs)
+				msg += 'Dim(%s) = %s; ' % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:]))
+				msg += 'Dim(Z) = %s; '  % str(Zs)
 				msg += 'ER = %e; '      % (float(err) / smp) if mode == 'train' and settings.peperr else ''
 				msg += 't = %.2f Sec '  % t
 				msg += '(%.2f Img/Sec)' % (Xb.shape[0] / t)
@@ -86,20 +86,36 @@ def process(X, Y, classifier, mode='train', aug=None, cp=[]):
 				print(msg, end='\r'); #sys.stdout.flush()
 
 	if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
-	return err
+	return model if mode == 'pretrain' else err
 
 ## Start
 
 print('Start')
 print('-' * 55 + ' ' + time.ctime())
 
+disable(net, 'DOUT') # disable dropout and only turn on when needed
+
+## Unsupervised Pretraining
+
+if settings.pretrain:
+
+	disable(net, 'DRED')
+
+	for l in CI:
+
+		print('Pretraining Network Layer %d (Ratio = %.2f)' % (l+1, settings.pretrain))
+		C = process(XT, np.array([]), None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
+		pretrain(net[:(l+1)], [], Zs, C, settings.pretrain)
+
+	enable(net, 'DRED')
+
+	saveW(net, settings.save)
+	print('-' * 55 + ' ' + time.ctime())
+
 ## Training
 
-classifier       = Linear(*lcarg)
-CI               = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV'] # CONV layers
+classifier = [Linear(*lcarg) for l in CI]
 settings.lrnrate = evalparam(settings.lrnrate)
-
-disable(net, 'DOUT') # disable dropout and only turn on when training CONV layers
 
 for n in xrange(settings.epoch):
 
@@ -113,17 +129,15 @@ for n in xrange(settings.epoch):
 
 			enable(net, 'DOUT')
 
-			for l in CI[::-1]: # Top-down Order
+			for l in xrange(len(CI)): # Top-down Order?
 
-				print('Subepoch %d/%d [Training Network Layer %d (Rate = %.2f)]' % (s+1, settings.lrnfreq, l+1, settings.lrnrate[0]))
+				print('Subepoch %d/%d [Training Network Layer %d (Rate = %.2f)]' % (s+1, settings.lrnfreq, CI[l]+1, settings.lrnrate[0]))
 
-				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, cp=[l], aug=aug)
-				solve(classifier, settings.lcparam[-1]) # using strongest smoothing
+				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier[l], cp=[CI[l]], aug=aug)
+				solve(classifier[l], settings.lcparam[-1]) # using strongest smoothing
 
-				def unflatten(WZ): return np.rollaxis(np.reshape(WZ[:-1] if settings.bias else WZ, Zs + (-1,)), -1)
-
-				train(net, unflatten(classifier.WZ), l, settings.lrntied, settings.lrnrate[0])
-				#classifier = Linear(*lcarg) # new classifier since net changed (or not?)
+				train(net, unflatten(classifier[l].WZ, Zs), CI[l], settings.lrntied, settings.lrnrate[0])
+				#classifier[l] = Linear(*lcarg) # new classifier since net changed (or not?)
 
 			saveW(net, settings.save)
 			settings.lrnrate = settings.lrnrate[1:]
@@ -134,12 +148,12 @@ for n in xrange(settings.epoch):
 
 			print('Subepoch %d/%d [Training Classifier]' % (s+1, settings.lrnfreq))
 
-			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier, aug=aug)
+			process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier[0], aug=aug)
 
-	if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
+	if settings.peperr and classifier[0].WZ is not None and n < (settings.epoch - 1):
 
-		if Xv.shape[0] > 0: print('VAL Error = %d' % process(Xv, Yv, classifier, mode='test'))
-		if Xt.shape[0] > 0: print('TST Error = %d' % process(Xt, Yt, classifier, mode='test'))
+		if Xv.shape[0] > 0: print('VAL Error = %d' % process(Xv, Yv, classifier[0], mode='test'))
+		if Xt.shape[0] > 0: print('TST Error = %d' % process(Xt, Yt, classifier[0], mode='test'))
 
 	print('-' * 55 + ' ' + time.ctime())
 
@@ -149,11 +163,11 @@ for p in xrange(len(settings.lcparam)):
 
 	print('Testing Classifier (p = %.2f)' % settings.lcparam[p])
 
-	solve(classifier, settings.lcparam[p])
+	solve(classifier[0], settings.lcparam[p])
 
-	print(                    '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
-	if settings.trnerr: print('TRN Error = %d' % process(XT, YT, classifier, mode='test'))
-	if Xv.shape[0] > 0: print('VAL Error = %d' % process(Xv, Yv, classifier, mode='test'))
-	if Xt.shape[0] > 0: print('TST Error = %d' % process(Xt, Yt, classifier, mode='test'))
+	print(                    '||WZ||    = %e' % np.linalg.norm(classifier[0].WZ))
+	if settings.trnerr: print('TRN Error = %d' % process(XT, YT, classifier[0], mode='test'))
+	if Xv.shape[0] > 0: print('VAL Error = %d' % process(Xv, Yv, classifier[0], mode='test'))
+	if Xt.shape[0] > 0: print('TST Error = %d' % process(Xt, Yt, classifier[0], mode='test'))
 
 	print('-' * 55 + ' ' + time.ctime())

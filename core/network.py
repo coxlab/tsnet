@@ -1,4 +1,7 @@
 import numpy as np
+from itertools import product
+from scipy.linalg.blas import ssyrk
+from scipy.linalg import eigh
 from scipy.sparse.linalg import svds
 from core.layers import *
 from config import TYPE, EN, PARAM
@@ -18,19 +21,19 @@ def forward(net, X, cp=[]):
 
 	for l in xrange(len(net)):
 
-		Z = X if l in cp + [0] else Z
+		if l in cp + [0]: Z = X
 
-		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, net[l][PARAM], net[l][PARAM+1], net[l][PARAM+2]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, net[l][PARAM], net[l][PARAM+1]                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z, net[l][PARAM]                                  ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                                                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z, net[l][PARAM]                                  ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z, net[l][PARAM]                                  ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'DRED':    Z = redimension(   Z, net[l][PARAM]                                  ) if net[l][EN] else     Z
+		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, net[l][PARAM], net[l][PARAM+1]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, net[l][PARAM], net[l][PARAM+1]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z, net[l][PARAM]                 ) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                                ) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z, net[l][PARAM]                 ) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z, net[l][PARAM]                 ) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'DRED':    Z = redimension(   Z, net[l][PARAM]                 ) if net[l][EN] else     Z
 
 		else: raise StandardError('Operation in Layer {0} Undefined!'.format(str(l+1)))
 
-	return Z
+	return Z if len(cp) != len(net) else getXe()
 
 def disable(net, lt):
 
@@ -43,6 +46,21 @@ def enable(net, lt):
 	for l in xrange(len(net)):
 
 		if net[l][TYPE] == lt: net[l][EN] = True
+
+def pretrain(net, Xe, Xs, C, ratio=0.5):
+
+	if C is None: C = np.zeros((Xe.shape[1],)*2, dtype='float32', order='F')
+
+	if net is None: return ssyrk(alpha=1.0, a=Xe, trans=1, beta=1.0, c=C, overwrite_c=1)
+	else:
+		C += C.T; C[np.diag_indices_from(C)] /= 2
+		_, V = eigh(C, overwrite_a=True); V = V[:,::-1].T
+
+		V = V.reshape((-1,) + Xs[-3:])
+		V = V[:np.ceil(V.shape[0] * ratio)]
+		P = np.random.randn(net[-1][PARAM].shape[0], V.shape[0]).astype('float32')
+
+		net[-1][PARAM] = np.tensordot(P, V, [(1,),(0,)])
 
 def reorder(s, V, W):
 
@@ -66,6 +84,10 @@ def reorder(s, V, W):
 # W : cho, chi, wy, wx
 # WZ: class, (...), cho, y, x, chi, wy, wx
 
+def unflatten(WZ, Zs):
+
+	return np.rollaxis(np.reshape(WZ, Zs + (-1,)), -1)
+
 def train(net, WZ, l, tied=True, rate=1.0):
 
 	# Recover WZ Dimensionality
@@ -87,11 +109,11 @@ def train(net, WZ, l, tied=True, rate=1.0):
 		else:
 			V = np.zeros_like(W[g[ch]])
 
-			for y in xrange(WZ.shape[-5]):
-				for x in xrange(WZ.shape[-4]):
-					_, sloc, Vloc = svds(WZ[...,ch,y,x,:,:,:].reshape(-1, np.prod(WZ.shape[-3:])), k=len(g[ch]))
-					sloc,    Vloc = reorder(sloc, Vloc, W[g[ch]])
-					V            += sloc[:,None,None,None] * Vloc
+			for y, x in product(xrange(WZ.shape[-5]), xrange(WZ.shape[-4])):
+
+				_, sloc, Vloc = svds(WZ[...,ch,y,x,:,:,:].reshape(-1, np.prod(WZ.shape[-3:])), k=len(g[ch]))
+				sloc,    Vloc = reorder(sloc, Vloc, W[g[ch]])
+				V            += sloc[:,None,None,None] * Vloc
 
 			V /= np.linalg.norm(V.reshape(len(g[ch]),-1), axis=1)[:,None,None,None]
 
@@ -99,3 +121,4 @@ def train(net, WZ, l, tied=True, rate=1.0):
 		W[g[ch]] = rate * V + (1-rate) * W[g[ch]]
 
 	net[l][PARAM] = W
+

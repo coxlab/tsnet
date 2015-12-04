@@ -7,19 +7,19 @@ LC_DEFAULT      = [EXACT_DEFAULT, LOWRANK_DEFAULT, ASGD_DEFAULT]
 
 import argparse; parser = argparse.ArgumentParser()
 
-parser.add_argument('-network', default=['mnist_1l'], nargs='*') # padd:3,3,3,3 conv:55,1,7,7/0/1,1 mpol:7,7/7,7 dred:25/1
+parser.add_argument('-network', default=['mnist_1l'], nargs='*') # padd:3,3,3,3 conv:55,1,7,7/1,1 mpol:7,7/7,7 dred:25/1
 parser.add_argument('-dataset', default='mnist')
 
-parser.add_argument('-batchsize', type=int, default=50)
+parser.add_argument('-batchsize', type=int,   default=50)
+parser.add_argument('-pretrain' , type=float, default=0 )
 
 parser.add_argument('-epoch'  , type=int, default=1            )
 parser.add_argument('-lrnfreq', type=int, default=1            ) # learn N times per epoch until no more rate specified
 parser.add_argument('-lrnrate',           default=[], nargs='*') # 0.5
 parser.add_argument('-lrntied',           action='store_true'  )
 
-parser.add_argument('-lc'     , type=int  , default=0                    )
+parser.add_argument('-lc'     , type=int  , default=2                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
-parser.add_argument('-bias'   ,             action='store_true'          )
 parser.add_argument('-mc'     , type=int  , default=0                    )
 
 parser.add_argument('-noaug' , action='store_true')
@@ -66,9 +66,8 @@ def netinit(netspec, ds=None):
 
 			if net[l][TYPE] == 'CONV':
 
-				net[l][PARAM  ] = np.random.randn(*net[l][PARAM]).astype('float32') # W
-				net[l][PARAM+1] = np.zeros(net[l][PARAM].shape[0], dtype='float32') if net[l][PARAM+1] == 1 else None # B
-				d               = l
+				net[l][PARAM] = np.random.randn(*net[l][PARAM]).astype('float32')
+				d             = l
 			
 			elif net[l][TYPE] == 'DRED':
 
