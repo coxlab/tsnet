@@ -35,7 +35,7 @@ Xe = []
 def getXe(): return Xe
 
 #@profile
-def convolution(X, Z, W, s):
+def convolution(X, Z, W, s, B=None):
 
 	X = im2col(X, (1,)+W.shape[1:]).squeeze(4)
 	Z = im2col(Z, (1,)+W.shape[1:]).squeeze(4)
@@ -49,7 +49,7 @@ def convolution(X, Z, W, s):
 	X = np.tensordot(X.squeeze(1), W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
 	Z = np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION else Z
 
-	#if B is not None: X = X + B.reshape(1,-1,1,1)
+	if B is not None: X = X + B.reshape(1,-1,1,1)
 
 	return X, Z
 

@@ -21,7 +21,7 @@ net += [[]]; net[-1] += ['CONV']; net[-1] += [True]; net[-1] += [W1];    net[-1]
 #net += [[]]; net[-1] += ['RELU']; net[-1] += [True];
 net += [[]]; net[-1] += ['DOUT']; net[-1] += [True]; net[-1] += [.5];
 net += [[]]; net[-1] += ['MPOL']; net[-1] += [True]; net[-1] += [[3,3]]; net[-1] += [[2,2]];
-net += [[]]; net[-1] += ['DRED']; net[-1] += [True]; net[-1] += [V];
+#net += [[]]; net[-1] += ['DRED']; net[-1] += [True]; net[-1] += [V];
 net += [[]]; net[-1] += ['CONV']; net[-1] += [True]; net[-1] += [W2];    net[-1] += [None];
 #net += [[]]; net[-1] += ['RELU']; net[-1] += [True];
 net += [[]]; net[-1] += ['DOUT']; net[-1] += [True]; net[-1] += [.5];

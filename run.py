@@ -60,33 +60,47 @@ def process(X, Y, model, mode='train', aug=None, cp=[], net=net):
 
 			Xb = X[i:i+settings.batchsize]; smp += Xb.shape[0]
 			Yb = Y[i:i+settings.batchsize]
-
 			Xb = aug(Xb) if aug is not None else Xb
 
-			Zb = forward(net, Xb, cp)
-			Zs = Zb.shape[1:]                if mode != 'pretrain' else Zb.shape[-3:]
-			Zb = Zb.reshape(Zb.shape[0], -1) if mode != 'pretrain' else Zb.reshape(-1, np.prod(Zs))
+			if mode == 'pretrain':
 
-			if   mode == 'pretrain': model = pretrain(None, Zb, Zs, model)
-			elif mode == 'train'   : update(model, Zb, enc(Yb, NC))
-			elif mode == 'test'    : err += np.count_nonzero(dec(infer(model, Zb), NC) != Yb)
+				Xe, Xo = forward(net, Xb, cp)
+				model  = pretrain(None, Xe, Xo, model, mode='update')
 
-			if mode == 'train' and settings.peperr: err += np.count_nonzero(dec(model.tif, NC) != Yb)
+			elif mode == 'train':
+
+				Zb = forward(net, Xb, cp)
+				Zs = Zb.shape[1:]
+				Zb = Zb.reshape(Zb.shape[0], -1)
+
+				update(model, Zb, enc(Yb, NC))
+				err += np.count_nonzero(dec(model.tif, NC) != Yb) if settings.peperr else 0
+
+			elif mode == 'test':
+
+				Zb = forward(net, Xb, cp)
+				Zs = Zb.shape[1:]
+				Zb = Zb.reshape(Zb.shape[0], -1)
+
+				err += np.count_nonzero(dec(infer(model, Zb), NC) != Yb)
 
 			if not settings.quiet:
+
 				t    = float(time.time() - t)
 				msg  = 'Batch %d/%d '   % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
 				msg += '['
-				msg += 'Dim(%s) = %s; ' % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:]))
-				msg += 'Dim(Z) = %s; '  % str(Zs)
-				msg += 'ER = %e; '      % (float(err) / smp) if mode == 'train' and settings.peperr else ''
+				#msg += 'Dim(%s) = %s; ' % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:]))
+				#msg += 'Dim(Z) = %s; '  % str(Zs)
+				msg += 'ER = %e; '      % (float(err) / smp) if (mode == 'train') and settings.peperr else ''
 				msg += 't = %.2f Sec '  % t
 				msg += '(%.2f Img/Sec)' % (Xb.shape[0] / t)
 				msg += ']'
 				print(msg, end='\r'); #sys.stdout.flush()
 
 	if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
-	return model if mode == 'pretrain' else err
+
+	if mode == 'test': return err
+	else             : return model
 
 ## Start
 
@@ -104,8 +118,12 @@ if settings.pretrain:
 	for l in CI:
 
 		print('Pretraining Network Layer %d (Ratio = %.2f)' % (l+1, settings.pretrain))
-		C = process(XT, np.array([]), None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
-		pretrain(net[:(l+1)], [], Zs, C, settings.pretrain)
+
+		xstat = process(XT, np.empty(0), None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
+		pretrain(net[:(l+1)], [], [], xstat, mode='solve', ratio=settings.pretrain)
+
+		xstat = process(XT, np.empty(0), None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
+		pretrain(net[:(l+1)], [], [], xstat, mode='center')
 
 	enable(net, 'DRED')
 

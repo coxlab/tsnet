@@ -6,6 +6,8 @@ from scipy.sparse.linalg import svds
 from core.layers import *
 from config import TYPE, EN, PARAM
 
+## Tools
+
 def redimension(Z, P, depth=1, mode='D'):
 
 	ZI = 1 + 3*depth + np.arange(3)
@@ -15,25 +17,6 @@ def redimension(Z, P, depth=1, mode='D'):
 	Z = Z.transpose(range(ZI[0]) + range(Z.ndim-3, Z.ndim) + range(ZI[0], Z.ndim-3))
 
 	return Z
-
-#@profile
-def forward(net, X, cp=[]):
-
-	for l in xrange(len(net)):
-
-		if l in cp + [0]: Z = X
-
-		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, net[l][PARAM], net[l][PARAM+1]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, net[l][PARAM], net[l][PARAM+1]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z, net[l][PARAM]                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                                ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z, net[l][PARAM]                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z, net[l][PARAM]                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'DRED':    Z = redimension(   Z, net[l][PARAM]                 ) if net[l][EN] else     Z
-
-		else: raise StandardError('Operation in Layer {0} Undefined!'.format(str(l+1)))
-
-	return Z if len(cp) != len(net) else getXe()
 
 def disable(net, lt):
 
@@ -47,20 +30,83 @@ def enable(net, lt):
 
 		if net[l][TYPE] == lt: net[l][EN] = True
 
-def pretrain(net, Xe, Xs, C, ratio=0.5):
+## Feedforward Function
 
-	if C is None: C = np.zeros((Xe.shape[1],)*2, dtype='float32', order='F')
+#@profile
+def forward(net, X, cp=[]):
 
-	if net is None: return ssyrk(alpha=1.0, a=Xe, trans=1, beta=1.0, c=C, overwrite_c=1)
-	else:
-		C += C.T; C[np.diag_indices_from(C)] /= 2
-		_, V = eigh(C, overwrite_a=True); V = V[:,::-1].T
+	for l in xrange(len(net)):
 
-		V = V.reshape((-1,) + Xs[-3:])
+		if l in cp + [0]: Z = X
+
+		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                 ) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'DRED':    Z = redimension(   Z,  net[l][PARAM ]) if net[l][EN] else     Z
+
+		else: raise StandardError('Operation in Layer {0} Undefined!'.format(str(l+1)))
+
+	if len(cp) != len(net): return Z
+	else                  : return getXe(), X
+
+## Unsupervised Pretraining
+
+def pretrain(net, Xe, Xo, model, mode='update', ratio=0.5):
+
+	if mode == 'update':
+
+		Xe = Xe.reshape(-1, np.prod(Xe.shape[-3:]))
+
+		if model is None:
+
+			model      = {}
+			model['C'] = np.zeros((Xe.shape[1],)*2, dtype='float32', order='F')
+			model['u'] = []
+			model['s'] = []
+
+		model['C']  = ssyrk(alpha=1.0, a=Xe, trans=1, beta=1.0, c=model['C'], overwrite_c=1)
+		model['u'] += [np.mean(Xo, (0,2,3))[:,None]]
+		model['s'] += [np.var (Xo, (0,2,3))[:,None]]
+
+		return model
+
+	elif mode == 'solve':
+
+		model['C'] += model['C'].T
+		model['C'][np.diag_indices_from(model['C'])] /= 2
+
+		_, V = eigh(model['C'], overwrite_a=True)
+		V    = V[:,::-1].T
+
+		V = V.reshape((-1,) + net[-1][PARAM].shape[-3:])
 		V = V[:np.ceil(V.shape[0] * ratio)]
 		P = np.random.randn(net[-1][PARAM].shape[0], V.shape[0]).astype('float32')
 
 		net[-1][PARAM] = np.tensordot(P, V, [(1,),(0,)])
+
+	elif mode == 'center':
+
+		model['u']  = np.hstack(model['u'])
+		model['s']  = np.hstack(model['s'])
+		model['s'] += np.square(model['u'] - np.mean(model['u'], 1)[:,None])
+		model['u']  = np.mean(model['u'], 1)
+		model['s']  = np.mean(model['s'], 1)
+		model['s']  = np.sqrt(model['s']   )
+
+		net[-1][PARAM] /=   model['s'][:,None,None,None]
+		net[-1]        += [-model['u'] / model['s']]
+
+## Supervised Training
+
+# W : cho, chi, wy, wx
+# WZ: class, (...), cho, y, x, chi, wy, wx
+
+def unflatten(WZ, Zs):
+
+	return np.rollaxis(np.reshape(WZ, Zs + (-1,)), -1)
 
 def reorder(s, V, W):
 
@@ -80,13 +126,6 @@ def reorder(s, V, W):
 	O  = np.argsort(O)
 
 	return s[O], V[O]
-
-# W : cho, chi, wy, wx
-# WZ: class, (...), cho, y, x, chi, wy, wx
-
-def unflatten(WZ, Zs):
-
-	return np.rollaxis(np.reshape(WZ, Zs + (-1,)), -1)
 
 def train(net, WZ, l, tied=True, rate=1.0):
 
