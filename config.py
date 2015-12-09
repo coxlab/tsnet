@@ -18,19 +18,19 @@ parser.add_argument('-lrnfreq', type=int, default=1            ) # learn N times
 parser.add_argument('-lrnrate',           default=[], nargs='*') # 0.5
 parser.add_argument('-lrntied',           action='store_true'  )
 
-parser.add_argument('-lc'     , type=int  , default=2                    )
+parser.add_argument('-lcalg'  , type=int  , default=2                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
-parser.add_argument('-mc'     , type=int  , default=0                    )
+parser.add_argument('-mcalg'  , type=int  , default=0                    )
 
 parser.add_argument('-noaug' , action='store_true')
 parser.add_argument('-peperr', action='store_true') # report error per epoch
 parser.add_argument('-trnerr', action='store_true')
 parser.add_argument('-quiet' , action='store_true')
-parser.add_argument('-memest', action='store_true') # '-memmax'
 
-parser.add_argument('-seed', type=int, default=0            )
-parser.add_argument('-save',           default=''           ) # save Ws to filename
-parser.add_argument('-fast', type=int, default=[], nargs='*') # fast run with fewer data points
+parser.add_argument('-seed' , type=int, default=0            )
+parser.add_argument('-save' ,           default=''           ) # save Ws to filename
+parser.add_argument('-fast' , type=int, default=[], nargs='*') # fast run with fewer data points
+parser.add_argument('-limit', type=int, default=-1           )
 
 ## Network Initialization
 
@@ -40,66 +40,75 @@ import numpy as np
 from scipy.linalg import qr
 from scipy.io import loadmat
 
-def netinit(netspec, ds=None):
+def netinit(netspec, ds='mnist'):
 
-	if ':' in netspec[0]: # Define Using Strings
-		
-		net = []
+	if ':' not in netspec[0]: exec 'from examples import %s as netspec' % netspec[0]
 
-		for l in xrange(len(netspec)):
+	net = []
 
-			ls = netspec[l].replace('/',':').split(':')
+	for l in xrange(len(netspec)): # Fill Hyperparameters
 
-			net     += [[]]
-			net[-1] += [ls[0].upper()] # type
-			net[-1] += [True]          # enable
-			
-			for p in xrange(1,len(ls)): # parameters
+		layerspec = netspec[l].replace('/',':').split(':')
 
-				try   : net[-1] += [[int(n)   for n in ls[p].split(',')]]
-				except: net[-1] += [[float(n) for n in ls[p].split(',')]]
+		net     += [[]]
+		net[-1] += [layerspec[0].upper()] # TYPE
+		net[-1] += [True]                 # EN
 
-				if len(net[-1][-1]) == 1: net[-1][-1] = net[-1][-1][0]
+		for p in xrange(1,len(layerspec)): # PARAM(s)
 
-		# Generate W (and B, though useless) for CONV and REDIM
-		for l in xrange(len(netspec)):
+			try   : net[-1] += [[int  (n) for n in layerspec[p].split(',')]]
+			except: net[-1] += [[float(n) for n in layerspec[p].split(',')]]
 
-			if net[l][TYPE] == 'CONV':
+			if len(net[-1][-1]) == 1: net[-1][-1] = net[-1][-1][0]
 
-				net[l][PARAM] = np.random.randn(*net[l][PARAM]).astype('float32')
-				d             = l
-			
-			elif net[l][TYPE] == 'DRED':
+	for l in xrange(len(net)): # Fill Parameters
 
-				if len(net[l]) <= PARAM+1: # Random Bases
+		if net[l][TYPE] == 'CONV':
 
-					net[l][PARAM]    = np.random.randn(np.prod(net[d][PARAM].shape[1:]), net[l][PARAM]).astype('float32')
-					net[l][PARAM], _ = qr(net[l][PARAM], mode='economic')
-					net[l][PARAM]    = net[l][PARAM].reshape(net[d][PARAM].shape[1:] + (1,1,-1))
+			net[l][PARAM] = np.random.randn(*net[l][PARAM]).astype('float32')
+			d             = l
 
-				else: # PCA Bases
+		elif net[l][TYPE] == 'DRED':
 
-					net[l][PARAM] = loadmat('datasets/bases/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
-					net[l][PARAM] = net[l][PARAM].transpose(1,2,3,0)[:,:,:,None,None,:]
+			if len(net[l]) <= PARAM+1: # Random Bases
 
-					if net[l][PARAM+1] == 1: # Reinitialize W of CONV with PCA Bases
+				net[l][PARAM]    = np.random.randn(np.prod(net[d][PARAM].shape[1:]), net[l][PARAM]).astype('float32')
+				net[l][PARAM], _ = qr(net[l][PARAM], mode='economic')
+				net[l][PARAM]    = net[l][PARAM].reshape(net[d][PARAM].shape[1:] + (1,1,-1))
 
-						net[d][PARAM] = np.random.randn(net[d][PARAM].shape[0], 1, 1, net[l][PARAM].shape[-1]).astype('float32')
-						net[d][PARAM] = np.tensordot(net[d][PARAM], net[l][PARAM], ([1,2,3],[3,4,5]))
+			else: # PCA Bases
 
-					net[l] = net[l][:-1]
+				net[l][PARAM] = loadmat('datasets/bases/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
+				net[l][PARAM] = net[l][PARAM].transpose(1,2,3,0)[:,:,:,None,None,:]
 
-	else: # Define Using Examples
+				if net[l][PARAM+1] == 1: # Reinitialize W of CONV with PCA Bases
 
-		exec 'from examples.%s import net' % netspec[0]
+					net[d][PARAM] = np.random.randn(net[d][PARAM].shape[0], 1, 1, net[l][PARAM].shape[-1]).astype('float32')
+					net[d][PARAM] = np.tensordot(net[d][PARAM], net[l][PARAM], ([1,2,3],[3,4,5]))
+
+				net[l] = net[l][:-1]
 
 	return net
 
-def evalparam(param):
+## Extra Tools
+
+def np2param(param):
 
 	for i in xrange(len(param)):
 
 		try   : param[i] = [float(param[i])]
 		except: param[i] = eval('np.' + param[i])
 
-	return [p for P in param for p in P]
+	return [val for sec in param for val in sec]
+
+def memest(net, dataset, forward, bsiz, mccode):
+
+	usage  = 0
+	usage += sum([item .nbytes for item  in dataset                                           ]) # Dataset
+	usage += sum([param.nbytes for layer in net for param in layer if hasattr(param, 'nbytes')]) # Network Parameters
+
+	batch  = forward(net, dataset[0][:bsiz]).reshape(bsiz, -1)
+	usage += batch.nbytes
+	usage += np.prod(batch.shape[1:]) * mccode.nbytes * 3 # ASGD with cache
+
+	return usage

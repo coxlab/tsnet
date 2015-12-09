@@ -3,7 +3,7 @@ import numexpr as ne
 from skimage.util.shape import view_as_windows
 from numpy.lib.stride_tricks import as_strided
 
-## Tools
+## Basic Tools
 
 def im2col(T, w):
 
@@ -125,3 +125,14 @@ def padding(X, Z, p):
 
         return X, Z
 
+## Special Layers
+
+def redimension(Z, P, depth=1, mode='D'):
+
+	ZI = 1 + 3*depth + np.arange(3)
+	PI = [0,1,2] if mode == 'D' else [3,4,5] # mode == 'U'
+
+	Z = np.tensordot(Z, P, (ZI, PI))
+	Z = Z.transpose(range(ZI[0]) + range(Z.ndim-3, Z.ndim) + range(ZI[0], Z.ndim-3))
+
+	return Z

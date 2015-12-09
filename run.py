@@ -4,19 +4,19 @@ import math, sys, time
 import numpy as np
 import warnings; warnings.filterwarnings("ignore")
 
+print('-' * 55 + ' ' + time.ctime())
+
 ## Load Settings
 
 from config import *
 settings = parser.parse_args(); np.random.seed(settings.seed)
-# move estmem here
-
-print('-' * 55 + ' ' + time.ctime())
 
 ## Load Network
 
-from tools import *
+from core.network import *
+
 net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
-CI = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV'] # CONV layers
+CI = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV']
 
 ## Load Dataset
 
@@ -31,21 +31,28 @@ if settings.noaug: aug = None
 
 ## Load Classifier
 
-if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lc]
+if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lcalg]
 
-if   settings.lc == 0: from classifier.exact   import *; lcarg = ()
-elif settings.lc == 1: from classifier.lowrank import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
-else                 : from classifier.asgd    import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+if   settings.lcalg == 0: from classifier.exact   import *; lcarg = ()
+elif settings.lcalg == 1: from classifier.lowrank import *; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
+else                    : from classifier.asgd    import *; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
-settings.peperr &= (settings.lc == 2)
+settings.peperr &= (settings.lcalg == 2)
 
-if   settings.mc == 0: from classifier.formatting import ovr ; enc, dec = ovr ()
-elif settings.mc == 1: from classifier.formatting import ovo ; enc, dec = ovo ()
-else                 : from classifier.formatting import ecoc; enc, dec = ecoc()
+if   settings.mcalg == 0: from classifier.formatting import ovr ; enc, dec = ovr ()
+elif settings.mcalg == 1: from classifier.formatting import ovo ; enc, dec = ovo ()
+else                    : from classifier.formatting import ecoc; enc, dec = ecoc()
+
+## Check Memory Usage
+
+if settings.limit >= 0:
+
+	usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], forward, settings.batchsize, enc(0, NC)) / 1024.0**2
+
+	print('Estimated Memory Usage = %.2f MB' % usage)
+	if usage > settings.limit: raise MemoryError('Over Limit!')
 
 ## Define Epoch/Subepoch
-
-from core.network import *
 
 Zs = ()
 
@@ -79,7 +86,7 @@ def process(X, Y, model, mode='train', aug=None, cp=[], net=net):
 			elif mode == 'test':
 
 				Zb = forward(net, Xb, cp)
-				Zs = Zb.shape[1:]
+				#Zs = Zb.shape[1:]
 				Zb = Zb.reshape(Zb.shape[0], -1)
 
 				err += np.count_nonzero(dec(infer(model, Zb), NC) != Yb)
@@ -133,7 +140,7 @@ if settings.pretrain:
 ## Training
 
 classifier = [Linear(*lcarg) for l in CI]
-settings.lrnrate = evalparam(settings.lrnrate)
+settings.lrnrate = np2param(settings.lrnrate)
 
 for n in xrange(settings.epoch):
 

@@ -6,30 +6,6 @@ from scipy.sparse.linalg import svds
 from core.layers import *
 from config import TYPE, EN, PARAM
 
-## Tools
-
-def redimension(Z, P, depth=1, mode='D'):
-
-	ZI = 1 + 3*depth + np.arange(3)
-	PI = [0,1,2] if mode == 'D' else [3,4,5] # mode == 'U'
-
-	Z = np.tensordot(Z, P, (ZI, PI))
-	Z = Z.transpose(range(ZI[0]) + range(Z.ndim-3, Z.ndim) + range(ZI[0], Z.ndim-3))
-
-	return Z
-
-def disable(net, lt):
-
-	for l in xrange(len(net)):
-
-		if net[l][TYPE] == lt: net[l][EN] = False
-
-def enable(net, lt):
-
-	for l in xrange(len(net)):
-
-		if net[l][TYPE] == lt: net[l][EN] = True
-
 ## Feedforward Function
 
 #@profile
@@ -47,7 +23,7 @@ def forward(net, X, cp=[]):
 		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'DRED':    Z = redimension(   Z,  net[l][PARAM ]) if net[l][EN] else     Z
 
-		else: raise StandardError('Operation in Layer {0} Undefined!'.format(str(l+1)))
+		else: raise TypeError('Operation in Layer {0} Undefined!'.format(str(l+1)))
 
 	if len(cp) != len(net): return Z
 	else                  : return getXe(), X
@@ -160,4 +136,34 @@ def train(net, WZ, l, tied=True, rate=1.0):
 		W[g[ch]] = rate * V + (1-rate) * W[g[ch]]
 
 	net[l][PARAM] = W
+
+## Extra Tools
+
+def disable(net, lt):
+
+	for l in xrange(len(net)):
+
+		if net[l][TYPE] == lt: net[l][EN] = False
+
+def enable(net, lt):
+
+	for l in xrange(len(net)):
+
+		if net[l][TYPE] == lt: net[l][EN] = True
+
+import os
+from scipy.io import savemat, loadmat
+
+def saveW(net, fn):
+
+	if not fn: return
+
+	if os.path.isfile(fn): W = loadmat(fn)['W']
+	else                 : W = np.zeros(0, dtype=np.object)
+
+	for l in xrange(len(net)):
+
+		if net[l][TYPE] == 'CONV': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = net[l][PARAM]
+
+	savemat(fn, {'W':W}, appendmat=False)
 
