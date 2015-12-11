@@ -25,14 +25,11 @@ Xt = Xt - Xm
 
 if __name__ != '__main__':
 
-	## Define Augmentation
-
 	from datasets.augmentation import *
 	def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
+	def get( ): return XT, YT, Xv, Yv, Xt, Yt, NC, aug
 
 else:
-
-	## Generate PCA Bases
 
 	from skimage.util.shape import view_as_windows
 	from scipy.linalg.blas import ssyrk

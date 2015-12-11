@@ -32,6 +32,11 @@ parser.add_argument('-save' ,           default=''           ) # save Ws to file
 parser.add_argument('-fast' , type=int, default=[], nargs='*') # fast run with fewer data points
 parser.add_argument('-limit', type=int, default=-1           )
 
+## Network Examples
+
+mnist_1l = ['padd:3,3,3,3', 'conv:55,1,7,7/1,1', 'mpol:7,7/7,7', 'dred:25/1']
+mnist_2l = [                'conv:55,1,7,7/2,2', 'mpol:3,3/2,2', 'dred:25/0', 'conv:55,55,3,3/1,1', 'mpol:3,3/1,1']
+
 ## Network Initialization
 
 TYPE = 0; EN = 1; PARAM = 2
@@ -42,7 +47,7 @@ from scipy.io import loadmat
 
 def netinit(netspec, ds='mnist'):
 
-	if ':' not in netspec[0]: exec 'from examples import %s as netspec' % netspec[0]
+	if ':' not in netspec[0]: exec 'netspec = %s' % netspec[0]
 
 	net = []
 
