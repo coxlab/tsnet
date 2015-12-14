@@ -112,7 +112,8 @@ def memest(net, dataset, forward, bsiz, mccode):
 	usage += sum([item .nbytes for item  in dataset                                           ]) # Dataset
 	usage += sum([param.nbytes for layer in net for param in layer if hasattr(param, 'nbytes')]) # Network Parameters
 
-	batch  = forward(net, dataset[0][:bsiz]).reshape(bsiz, -1)
+	batch  = forward(net, dataset[0][:bsiz]); print('Dim(Z) = %s' % str(batch.shape[1:]))
+	batch  = batch.reshape(bsiz, -1)
 	usage += batch.nbytes
 	usage += np.prod(batch.shape[1:]) * mccode.nbytes * 3 # ASGD with cache
 

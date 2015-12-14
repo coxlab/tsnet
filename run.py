@@ -7,6 +7,8 @@ import math, numpy as np
 from config import *
 from core.network import *
 
+Zs = ()
+
 def main(mainarg):
 
 	print('-' * 55 + ' ' + time.ctime())
@@ -56,8 +58,6 @@ def main(mainarg):
 		if usage > settings.limit > 0: raise MemoryError('Over Limit!')
 
 	## Define Epoch/Subepoch
-
-	Zs = ()
 
 	#@profile
 	def process(X, Y, model, mode='train', aug=None, cp=[], net=net):
@@ -119,8 +119,8 @@ def main(mainarg):
 
 	disable(net, 'DOUT') # disable dropout and only turn on when needed
 
-	bval = btst = float('inf')
-	fval = ftst = float('inf')
+	val = bval = fval = float('inf')
+	tst = btst = ftst = float('inf')
 
 	## Unsupervised Pretraining
 
