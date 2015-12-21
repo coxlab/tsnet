@@ -199,8 +199,8 @@ def main(mainarg):
 
 		solve(classifier[0], settings.lcparam[p])
 
-		print(                                                                       '||WZ||    = %e' % np.linalg.norm(classifier[0].WZ))
-		if settings.trnerr:                                                    print('TRN Error = %d' % process(XT, YT, classifier[0], mode='test'))
+		print(                                                                        '||WZ||    = %e' % np.linalg.norm(classifier[0].WZ))
+		if settings.trnerr:                                                     print('TRN Error = %d' % process(XT, YT, classifier[0], mode='test'))
 		if Xv.shape[0] > 0: fval = process(Xv, Yv, classifier[0], mode='test'); print('VAL Error = %d' % fval)
 		if Xt.shape[0] > 0: ftst = process(Xt, Yt, classifier[0], mode='test'); print('TST Error = %d' % ftst)
 

@@ -12,6 +12,14 @@ def im2col(T, w):
 
 	return T
 
+def striding(T, s):
+
+	o  = []
+	o += [((T.shape[2]-1) % s[0]) / 2]
+	o += [((T.shape[3]-1) % s[1]) / 2]
+
+	return T[:,:,o[0]::s[0],o[1]::s[1]]
+
 def expansion(Z, n):
 
 	if Z.shape[1] == n: return Z
@@ -41,8 +49,8 @@ def convolution(X, Z, W, s, B=None):
 	Z = im2col(Z, (1,)+W.shape[1:]).squeeze(4)
 
 	if s is not None:
-		X = X[:,:,::s[0],::s[1]]
-		Z = Z[:,:,::s[0],::s[1]]
+		X = striding(X, s) #X[:,:,::s[0],::s[1]]
+		Z = striding(Z, s) #Z[:,:,::s[0],::s[1]]
 
 	global Xe; Xe = X
 
@@ -60,8 +68,8 @@ def maxpooling(X, Z, w, s):
 	Z = im2col(Z, (1,1)+tuple(w)).squeeze((4,5))
 
 	if s is not None:
-		X = X[:,:,::s[0],::s[1]]
-		Z = Z[:,:,::s[0],::s[1]]
+		X = striding(X, s) #X[:,:,::s[0],::s[1]]
+		Z = striding(Z, s) #Z[:,:,::s[0],::s[1]]
 
 	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
 

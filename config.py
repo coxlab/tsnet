@@ -30,7 +30,7 @@ parser.add_argument('-quiet' , action='store_true')
 parser.add_argument('-seed' , type=int, default=0            )
 parser.add_argument('-save' ,           default=''           ) # save Ws to filename
 parser.add_argument('-fast' , type=int, default=[], nargs='*') # fast run with fewer data points
-parser.add_argument('-limit', type=int, default=-1           )
+parser.add_argument('-limit', type=int, default=0            )
 
 ## Network Examples
 
