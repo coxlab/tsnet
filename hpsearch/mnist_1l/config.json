@@ -1,0 +1,35 @@
+{
+    "language"        : "PYTHON",
+    "experiment-name" : "mint_mnist_1l",
+    "polling-time"    : 1,
+    "resources" : {
+        "my-machine" : {
+            "scheduler"         : "local",
+            "max-concurrent"    : 1,
+            "max-finished-jobs" : 1000
+        }
+    },
+    "tasks": {
+        "mint_mnist_1l" : {
+            "type"       : "OBJECTIVE",
+            "likelihood" : "GAUSSIAN",
+            "main-file"  : "mint_mnist_1l",
+            "resources"  : "my-machine"
+        }
+    },
+    "variables": {
+        "c1rf" : {
+            "type" : "INT",
+            "size" : 1,
+            "min"  : 3,
+            "max"  : 9
+        },
+        "p1rf" : {
+            "type" : "INT",
+            "size" : 1,
+            "min"  : 3,
+            "max"  : 9
+        }
+    }
+}
+
