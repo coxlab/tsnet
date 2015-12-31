@@ -1,6 +1,6 @@
 {
     "language"        : "PYTHON",
-    "experiment-name" : "mint_mnist_1l",
+    "experiment-name" : "mint",
     "polling-time"    : 1,
     "resources" : {
         "my-machine" : {
@@ -10,10 +10,10 @@
         }
     },
     "tasks": {
-        "mint_mnist_1l" : {
+        "mint" : {
             "type"       : "OBJECTIVE",
             "likelihood" : "GAUSSIAN",
-            "main-file"  : "mint_mnist_1l",
+            "main-file"  : "mint",
             "resources"  : "my-machine"
         }
     },
