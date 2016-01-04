@@ -7,10 +7,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.par
 from run import main as ssnet
 from itertools import product
 
-res = open(sys.argv[1] + '.res', 'w')
-def tee(line): print(line); print(line, file=res); res.flush()
-
-comm_temp = '-dataset mnist -epoch 10 -peperr -batchsize 10 -network conv:{0},1,{1},{1}/{2},{2} mpol:{3},{3}/{4},{4} -pretrain 0.5 -q -limit -1'
+comm_temp = '-dataset mnist -epoch 10 -peperr -batchsize 10 -network conv:{0},1,{1},{1}/{2},{2} mpol:{3},{3}/{4},{4} -pretrain 0.5 -q'
 
 for c1rf, p1rf in product(xrange(3,9+1,2), repeat=2):
 
@@ -21,10 +18,10 @@ for c1rf, p1rf in product(xrange(3,9+1,2), repeat=2):
 
 	comm_inst = comm_temp.format(c1fn, c1rf, c1st, p1rf, p1st)
 
-	tee('=' * 80)
-	tee(comm_inst)
+	print('=' * 80)
+	print(comm_inst)
 
-	try   : tee(ssnet(comm_inst.split()))
-	except: tee('Failed!')
+	try   : print('Results: ' + str(ssnet(comm_inst.split())))
+	except: print('Failed!')
 
-	tee('=' * 80)
+	print('=' * 80)
