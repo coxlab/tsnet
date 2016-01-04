@@ -20,8 +20,11 @@ for i in xrange(5):
 XT = np.concatenate(XT)
 YT = np.concatenate(YT)
 
-Xv = np.empty(0)
-Yv = np.empty(0)
+Xv = XT[40000:]; Yv = YT[40000:]
+XT = XT[:40000]; YT = YT[:40000]
+
+#Xv = np.empty(0)
+#Yv = np.empty(0)
 
 batch = cPickle.load(open(files[-1]))
 Xt = batch['data'  ].reshape(-1, 3, 32, 32)

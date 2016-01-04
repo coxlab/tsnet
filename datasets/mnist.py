@@ -7,8 +7,8 @@ dsdir += '/' if dsdir else ''
 
 (XT, YT), (Xt, Yt) = cPickle.load(open(dsdir+'mnist.pkl', 'rb')) # https://s3.amazonaws.com/img-datasets/mnist.pkl.gz
 
-Xv = XT[50000:];   Yv = YT[50000:]
-XT = XT[:50000];   YT = YT[:50000]
+Xv = XT[50000:]; Yv = YT[50000:]
+XT = XT[:50000]; YT = YT[:50000]
 
 XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') / 255
 Xv = Xv.reshape(Xv.shape[0], 1, 28, 28).astype('float32') / 255
