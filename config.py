@@ -10,13 +10,13 @@ import argparse; parser = argparse.ArgumentParser()
 parser.add_argument('-network', default=['mnist_1l'], nargs='*') # padd:3,3,3,3 conv:55,1,7,7/1,1 mpol:7,7/7,7 dred:25/1
 parser.add_argument('-dataset', default='mnist')
 
-parser.add_argument('-batchsize', type=int,   default=50)
-parser.add_argument('-pretrain' , type=float, default=0 )
+parser.add_argument('-batchsize', type=int,   default=50 )
+parser.add_argument('-pretrain' , type=float, default=0.5)
 
 parser.add_argument('-epoch'  , type=int, default=1            )
-parser.add_argument('-lrnfreq', type=int, default=1            ) # learn N times per epoch until no more rate specified
-parser.add_argument('-lrnrate',           default=[], nargs='*') # 0.5
-parser.add_argument('-lrntied',           action='store_true'  )
+#parser.add_argument('-lrnfreq', type=int, default=1            ) # learn N times per epoch until no more rate specified
+#parser.add_argument('-lrnrate',           default=[], nargs='*') # 0.5
+#parser.add_argument('-lrntied',           action='store_true'  )
 
 parser.add_argument('-lcalg'  , type=int  , default=2                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
@@ -34,16 +34,13 @@ parser.add_argument('-limit', type=int, default=0            )
 
 ## Network Examples
 
-mnist_1l = ['padd:3,3,3,3', 'conv:55,1,7,7/1,1', 'mpol:7,7/7,7', 'dred:25/1']
-mnist_2l = [                'conv:55,1,7,7/2,2', 'mpol:3,3/2,2', 'dred:25/0', 'conv:55,55,3,3/1,1', 'mpol:3,3/1,1']
+mnist_1l = ['padd:3,3,3,3', 'conv:55,1,7,7/1,1', 'mpol:7,7/7,7']
 
 ## Network Initialization
 
 TYPE = 0; EN = 1; PARAM = 2
 
 import numpy as np
-from scipy.linalg import qr
-from scipy.io import loadmat
 
 def netinit(netspec, ds='mnist'):
 
@@ -51,7 +48,9 @@ def netinit(netspec, ds='mnist'):
 
 	net = []
 
-	for l in xrange(len(netspec)): # Fill Hyperparameters
+	## Fill Hyperparameters
+
+	for l in xrange(len(netspec)):
 
 		layerspec = netspec[l].replace('/',':').split(':')
 
@@ -66,32 +65,14 @@ def netinit(netspec, ds='mnist'):
 
 			if len(net[-1][-1]) == 1: net[-1][-1] = net[-1][-1][0]
 
-	for l in xrange(len(net)): # Fill Parameters
+	## Fill Parameters
 
-		if net[l][TYPE] == 'CONV':
+	CL = [l for l in xrange(len(net)) if net[l][TYPE] == 'CONV']
 
-			net[l][PARAM] = np.random.randn(*net[l][PARAM]).astype('float32')
-			d             = l
+	for l in CL:
 
-		elif net[l][TYPE] == 'DRED':
-
-			if len(net[l]) <= PARAM+1: # Random Bases
-
-				net[l][PARAM]    = np.random.randn(np.prod(net[d][PARAM].shape[1:]), net[l][PARAM]).astype('float32')
-				net[l][PARAM], _ = qr(net[l][PARAM], mode='economic')
-				net[l][PARAM]    = net[l][PARAM].reshape(net[d][PARAM].shape[1:] + (1,1,-1))
-
-			else: # PCA Bases
-
-				net[l][PARAM] = loadmat('datasets/bases/' + ds + '_pc_rf%d.mat' % net[d][PARAM].shape[-1])['V'][:net[l][PARAM]]
-				net[l][PARAM] = net[l][PARAM].transpose(1,2,3,0)[:,:,:,None,None,:]
-
-				if net[l][PARAM+1] == 1: # Reinitialize W of CONV with PCA Bases
-
-					net[d][PARAM] = np.random.randn(net[d][PARAM].shape[0], 1, 1, net[l][PARAM].shape[-1]).astype('float32')
-					net[d][PARAM] = np.tensordot(net[d][PARAM], net[l][PARAM], ([1,2,3],[3,4,5]))
-
-				net[l] = net[l][:-1]
+		net[l][PARAM] = np.random.randn(*net[l][PARAM]).astype('float32')
+		net[l]       += [None] # Bias
 
 	return net
 

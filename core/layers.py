@@ -109,6 +109,19 @@ def relu(X, Z):
 	return X, Z
 
 #@profile
+def absl(X, Z):
+
+	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])
+
+	I = X <= 0
+	X = ne.evaluate('where(I, -X, X)', order='C')
+
+	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
+	Z = ne.evaluate('where(I, -Z, Z)', order='C')
+
+	return X, Z
+
+#@profile
 def dropout(X, Z, r):
 
 	if DELAYED_EXPANSION: Z = expansion(Z, X.shape[1])

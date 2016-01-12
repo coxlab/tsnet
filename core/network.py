@@ -1,8 +1,6 @@
 import numpy as np
 from itertools import product
-from scipy.linalg.blas import ssyrk
 from scipy.linalg import eigh
-from scipy.sparse.linalg import svds
 from core.layers import *
 from config import TYPE, EN, PARAM
 
@@ -17,11 +15,12 @@ def forward(net, X, cp=[]):
 
 		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
+		elif net[l][TYPE] == 'ABSL': X, Z = absl       (X, Z                 ) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'DRED':    Z = redimension(   Z,  net[l][PARAM ]) if net[l][EN] else     Z
+		#elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
+		#elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
+		#elif net[l][TYPE] == 'DRED':    Z = redimension(   Z,  net[l][PARAM ]) if net[l][EN] else     Z
 
 		else: raise TypeError('Operation in Layer {0} Undefined!'.format(str(l+1)))
 
@@ -30,20 +29,33 @@ def forward(net, X, cp=[]):
 
 ## Unsupervised Pretraining
 
-def pretrain(net, Xe, Xo, model, mode='update', ratio=0.5):
+def geig(Ca, Cb):
+
+	if Cb is None: s, V = eigh(Ca)
+	else:          s, V = eigh(Ca, Cb + (np.trace(Cb) / Cb.shape[0]) * np.eye(*Cb.shape, dtype='float32'))
+
+	return V[:,::-1], s[::-1]
+
+def pretrain(net, X, Y, model, mode='update', ratio=0.5):
 
 	if mode == 'update':
 
-		Xe = Xe.reshape(-1, np.prod(Xe.shape[-3:]))
+		Xe, Xo = X
 
 		if model is None:
 
 			model      = {}
-			model['C'] = np.zeros((Xe.shape[1],)*2, dtype='float32', order='F')
+			model['C'] = np.zeros((Y.shape[1],) + (np.prod(Xe.shape[-3:]),)*2, dtype='float32')
+			model['n'] = np.zeros( Y.shape[1]                                , dtype='float32')
 			model['u'] = []
 			model['s'] = []
 
-		model['C']  = ssyrk(alpha=1.0, a=Xe, trans=1, beta=1.0, c=model['C'], overwrite_c=1)
+		for c in xrange(Y.shape[1]):
+
+			Xt = Xe[Y[:,c]==1].reshape(-1, np.prod(Xe.shape[-3:]))
+			model['C'][c] += np.dot(Xt.T, Xt)
+			model['n'][c] += np.sum(Y[:,c]==1)
+
 		model['u'] += [np.mean(Xo, (0,2,3))[:,None]]
 		model['s'] += [np.var (Xo, (0,2,3))[:,None]]
 
@@ -51,17 +63,32 @@ def pretrain(net, Xe, Xo, model, mode='update', ratio=0.5):
 
 	elif mode == 'solve':
 
-		model['C'] += model['C'].T
-		model['C'][np.diag_indices_from(model['C'])] /= 2
+		#G = np.ones((1, model['C'].shape[0]))
+		G = np.eye(model['C'].shape[0])
+		V = []
+		n = net[-1][PARAM].shape[0]
 
-		_, V = eigh(model['C'], overwrite_a=True)
-		V    = V[:,::-1].T
+		for g in xrange(G.shape[0]):
 
+			ni = model['n'][G[g]==1].sum()
+			nj = model['n'][G[g]==0].sum()
+
+			Ci = (model['C'][G[g]==1].sum(0) / ni)
+			Cj = (model['C'][G[g]==0].sum(0) / nj) if nj != 0 else None
+
+			Vg, sg = geig(Ci, Cj)
+			ng     = len(range(n)[g::G.shape[0]])
+			Vg     = Vg[:,:ng].T
+			V     += [Vg]
+
+		V = np.vstack(V)
 		V = V.reshape((-1,) + net[-1][PARAM].shape[-3:])
-		V = V[:np.ceil(V.shape[0] * ratio)]
-		P = np.random.randn(net[-1][PARAM].shape[0], V.shape[0]).astype('float32')
 
-		net[-1][PARAM] = np.tensordot(P, V, [(1,),(0,)])
+		#V = V[:np.ceil(V.shape[0] * ratio)]
+		#P = np.random.randn(n, V.shape[0]).astype('float32')
+		#net[-1][PARAM] = np.tensordot(P, V, [(1,),(0,)])
+
+		net[-1][PARAM] = V.reshape((-1,) + net[-1][PARAM].shape[-3:])
 
 	elif mode == 'center':
 
@@ -72,70 +99,8 @@ def pretrain(net, Xe, Xo, model, mode='update', ratio=0.5):
 		model['s']  = np.mean(model['s'], 1)
 		model['s']  = np.sqrt(model['s']   )
 
-		net[-1][PARAM] /=   model['s'][:,None,None,None]
-		net[-1]        += [-model['u'] / model['s']]
-
-## Supervised Training
-
-# W : cho, chi, wy, wx
-# WZ: class, (...), cho, y, x, chi, wy, wx
-
-def unflatten(WZ, Zs):
-
-	return np.rollaxis(np.reshape(WZ, Zs + (-1,)), -1)
-
-def reorder(s, V, W):
-
-	V = V.reshape(W.shape)
-	V = V[::-1]; s = s[::-1]
-	C = np.tensordot(V, W, ([1,2,3],[1,2,3]))
-	O = []
-
-	for i in xrange(V.shape[0]):
-
-		tO  = np.argsort(np.abs(C[i]))[::-1]
-		tO  = [o for o in tO if o not in O]
-		O  += [tO[0]]
-
-	C  = C[xrange(V.shape[0]), O][:,None,None,None]
-	V *= np.sign(C)
-	O  = np.argsort(O)
-
-	return s[O], V[O]
-
-def train(net, WZ, l, tied=True, rate=1.0):
-
-	# Recover WZ Dimensionality
-	d = 1
-	for t in xrange(len(net)-1, l, -1):
-
-		if net[t][TYPE] == 'DRED' and net[t][EN]: WZ = redimension(WZ, net[t][PARAM], d, 'U')
-		if net[t][TYPE] == 'CONV'               : d  = d + 1
-
-	# SVD Learning
-	W = net[l][PARAM]
-	g = np.split(np.arange(W.shape[0]), WZ.shape[-6])
-
-	for ch in xrange(WZ.shape[-6]):
-
-		if tied: # Weight-shared Update
-			_, s, V = svds(WZ[...,ch,:,:,:,:,:].reshape(-1, np.prod(WZ.shape[-3:])), k=len(g[ch]))
-			_,    V = reorder(s, V, W[g[ch]])
-		else:
-			V = np.zeros_like(W[g[ch]])
-
-			for y, x in product(xrange(WZ.shape[-5]), xrange(WZ.shape[-4])):
-
-				_, sloc, Vloc = svds(WZ[...,ch,y,x,:,:,:].reshape(-1, np.prod(WZ.shape[-3:])), k=len(g[ch]))
-				sloc,    Vloc = reorder(sloc, Vloc, W[g[ch]])
-				V            += sloc[:,None,None,None] * Vloc
-
-			V /= np.linalg.norm(V.reshape(len(g[ch]),-1), axis=1)[:,None,None,None]
-
-		V *= np.linalg.norm(W[g[ch]].reshape(len(g[ch]),-1), axis=1)[:,None,None,None]
-		W[g[ch]] = rate * V + (1-rate) * W[g[ch]]
-
-	net[l][PARAM] = W
+		net[-1][PARAM]   /=  model['s'][:,None,None,None]
+		net[-1][PARAM+2]  = -model['u'] / model['s']
 
 ## Extra Tools
 

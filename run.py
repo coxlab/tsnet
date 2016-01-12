@@ -7,7 +7,7 @@ import math, numpy as np
 from config import *
 from core.network import *
 
-Zs = ()
+#Zs = ()
 
 def main(mainarg):
 
@@ -20,7 +20,7 @@ def main(mainarg):
 	## Load Network
 
 	net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
-	CI = [i for i in xrange(len(net)) if net[i][TYPE] == 'CONV']
+	CL = [l for l in xrange(len(net)) if net[l][TYPE] == 'CONV']
 
 	## Load Dataset
 
@@ -57,12 +57,12 @@ def main(mainarg):
 		print('Estimated Memory Usage = %.2f MB' % usage)
 		if usage > settings.limit > 0: raise MemoryError('Over Limit!')
 
-	## Define Epoch/Subepoch
+	## Define Epoch
 
 	#@profile
 	def process(X, Y, model, mode='train', aug=None, cp=[], net=net):
 
-		global Zs; smp = err = 0
+		smp = err = 0; #global Zs
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
 
@@ -74,13 +74,13 @@ def main(mainarg):
 
 				if mode == 'pretrain':
 
-					Xe, Xo = forward(net, Xb, cp)
-					model  = pretrain(None, Xe, Xo, model, mode='update')
+					Xt    = forward(net, Xb, cp)
+					model = pretrain(net, Xt, enc(Yb, NC), model, mode='update')
 
 				elif mode == 'train':
 
 					Zb = forward(net, Xb, cp)
-					Zs = Zb.shape[1:]
+					#Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
 					update(model, Zb, enc(Yb, NC))
@@ -117,8 +117,6 @@ def main(mainarg):
 	print('Preparation Done')
 	print('-' * 55 + ' ' + time.ctime())
 
-	disable(net, 'DOUT') # disable dropout and only turn on when needed
-
 	val = bval = fval = float('inf')
 	tst = btst = ftst = float('inf')
 
@@ -126,27 +124,23 @@ def main(mainarg):
 
 	if settings.pretrain:
 
-		disable(net, 'DRED')
-
-		for l in CI:
+		for l in CL:
 
 			print('Pretraining Network Layer %d (Ratio = %.2f)' % (l+1, settings.pretrain))
 
-			xstat = process(XT, np.empty(0), None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
+			xstat = process(XT, YT, None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
 			pretrain(net[:(l+1)], [], [], xstat, mode='solve', ratio=settings.pretrain)
 
-			xstat = process(XT, np.empty(0), None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
+			xstat = process(XT, YT, None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
 			pretrain(net[:(l+1)], [], [], xstat, mode='center')
-
-		enable(net, 'DRED')
 
 		saveW(net, settings.save)
 		print('-' * 55 + ' ' + time.ctime())
 
 	## Training
 
-	classifier = [Linear(*lcarg) for l in CI]
-	settings.lrnrate = np2param(settings.lrnrate)
+	classifier = Linear(*lcarg)
+	#settings.lrnrate = np2param(settings.lrnrate)
 
 	for n in xrange(settings.epoch):
 
@@ -154,37 +148,12 @@ def main(mainarg):
 
 		XT, YT = shuffle(XT, YT)
 
-		for s in xrange(settings.lrnfreq):
+		process(XT, YT, classifier, aug=aug)
 
-			if len(settings.lrnrate) > 0: # Network (and Classifier) Training
+		if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
 
-				enable(net, 'DOUT')
-
-				for l in xrange(len(CI)): # Top-down Order?
-
-					print('Subepoch %d/%d [Training Network Layer %d (Rate = %.2f)]' % (s+1, settings.lrnfreq, CI[l]+1, settings.lrnrate[0]))
-
-					process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier[l], cp=[CI[l]], aug=aug)
-					solve(classifier[l], settings.lcparam[-1]) # using strongest smoothing
-
-					train(net, unflatten(classifier[l].WZ, Zs), CI[l], settings.lrntied, settings.lrnrate[0])
-					#classifier[l] = Linear(*lcarg) # new classifier since net changed (or not?)
-
-				saveW(net, settings.save)
-				settings.lrnrate = settings.lrnrate[1:]
-
-				disable(net, 'DOUT')
-
-			else: # Classifier Training
-
-				print('Subepoch %d/%d [Training Classifier]' % (s+1, settings.lrnfreq))
-
-				process(XT[s::settings.lrnfreq], YT[s::settings.lrnfreq], classifier[0], aug=aug)
-
-		if settings.peperr and classifier[0].WZ is not None and n < (settings.epoch - 1):
-
-			if Xv.shape[0] > 0: val = process(Xv, Yv, classifier[0], mode='test'); print('VAL Error = %d' % val)
-			if Xt.shape[0] > 0: tst = process(Xt, Yt, classifier[0], mode='test'); print('TST Error = %d' % tst)
+			if Xv.shape[0] > 0: val = process(Xv, Yv, classifier, mode='test'); print('VAL Error = %d' % val)
+			if Xt.shape[0] > 0: tst = process(Xt, Yt, classifier, mode='test'); print('TST Error = %d' % tst)
 
 			if val < bval: bval = val
 			if tst < btst: btst = tst
@@ -197,12 +166,12 @@ def main(mainarg):
 
 		print('Testing Classifier (p = %.2f)' % settings.lcparam[p])
 
-		solve(classifier[0], settings.lcparam[p])
+		solve(classifier, settings.lcparam[p])
 
-		print(                                                                        '||WZ||    = %e' % np.linalg.norm(classifier[0].WZ))
-		if settings.trnerr:                                                     print('TRN Error = %d' % process(XT, YT, classifier[0], mode='test'))
-		if Xv.shape[0] > 0: fval = process(Xv, Yv, classifier[0], mode='test'); print('VAL Error = %d' % fval)
-		if Xt.shape[0] > 0: ftst = process(Xt, Yt, classifier[0], mode='test'); print('TST Error = %d' % ftst)
+		print(                                                                     '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
+		if settings.trnerr:                                                  print('TRN Error = %d' % process(XT, YT, classifier, mode='test'))
+		if Xv.shape[0] > 0: fval = process(Xv, Yv, classifier, mode='test'); print('VAL Error = %d' % fval)
+		if Xt.shape[0] > 0: ftst = process(Xt, Yt, classifier, mode='test'); print('TST Error = %d' % ftst)
 
 		if fval < bval: bval = fval
 		if ftst < btst: btst = ftst
