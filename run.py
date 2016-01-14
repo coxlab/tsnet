@@ -20,7 +20,9 @@ def main(mainarg):
 	## Load Network
 
 	net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
+	NL = [l for l in xrange(len(net)) if net[l][TYPE] == 'NORM']
 	CL = [l for l in xrange(len(net)) if net[l][TYPE] == 'CONV']
+	cp = [] if 0 not in NL else [1]
 
 	## Load Dataset
 
@@ -60,7 +62,7 @@ def main(mainarg):
 	## Define Epoch
 
 	#@profile
-	def process(X, Y, model, mode='train', aug=None, cp=[], net=net):
+	def process(X, Y, model, mode='train', aug=None, cp=cp, net=net):
 
 		smp = err = 0; #global Zs
 
@@ -74,8 +76,9 @@ def main(mainarg):
 
 				if mode == 'pretrain':
 
-					Xt    = forward(net, Xb, cp)
-					model = pretrain(net, Xt, enc(Yb, NC), model, mode='update')
+					Xi    = forward(net, Xb, cp)
+					Yi    = enc(Yb, NC) if Yb.shape[0] > 0 else Yb
+					model = pretrain(net, Xi, Yi, model, mode='update')
 
 				elif mode == 'train':
 
@@ -120,19 +123,17 @@ def main(mainarg):
 	val = bval = fval = float('inf')
 	tst = btst = ftst = float('inf')
 
-	## Unsupervised Pretraining
+	## Pretraining
 
 	if settings.pretrain:
 
-		for l in CL:
+		for l in sorted(NL + CL):
 
-			print('Pretraining Network Layer %d (Ratio = %.2f)' % (l+1, settings.pretrain))
+			print('Pretraining Network Layer %d' % (l+1))
 
-			xstat = process(XT, YT, None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
-			pretrain(net[:(l+1)], [], [], xstat, mode='solve', ratio=settings.pretrain)
-
-			xstat = process(XT, YT, None, mode='pretrain', cp=range(l+1), net=net[:(l+1)])
-			pretrain(net[:(l+1)], [], [], xstat, mode='center')
+			Xstat = None
+			Xstat = process(      XT, YT if l in CL else np.empty(0), Xstat, mode='pretrain', cp=[-1], net=net[:(l+1)])
+			pretrain(net[:(l+1)], XT, YT if l in CL else np.empty(0), Xstat, mode='solve')
 
 		saveW(net, settings.save)
 		print('-' * 55 + ' ' + time.ctime())
@@ -144,7 +145,7 @@ def main(mainarg):
 
 	for n in xrange(settings.epoch):
 
-		print('Epoch %d/%d' % (n+1, settings.epoch))
+		print('Training Epoch %d/%d' % (n+1, settings.epoch))
 
 		XT, YT = shuffle(XT, YT)
 

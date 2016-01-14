@@ -39,8 +39,8 @@ def indices(shape): # memory efficient np.indices
 
 DELAYED_EXPANSION = True
 
-Xe = []
-def getXe(): return Xe
+Xi = []
+def getXi(): return Xi
 
 #@profile
 def convolution(X, Z, W, s, B=None):
@@ -52,12 +52,12 @@ def convolution(X, Z, W, s, B=None):
 		X = striding(X, s) #X[:,:,::s[0],::s[1]]
 		Z = striding(Z, s) #Z[:,:,::s[0],::s[1]]
 
-	global Xe; Xe = X
+	global Xi; Xi = X
 
 	X = np.tensordot(X.squeeze(1), W, ([3,4,5],[1,2,3])).transpose(0,3,1,2)
 	Z = np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION else Z
 
-	if B is not None: X = X + B.reshape(1,-1,1,1)
+	if B is not None: X += B.reshape(1,-1,1,1)
 
 	return X, Z
 
@@ -147,6 +147,15 @@ def padding(X, Z, p):
         return X, Z
 
 ## Special Layers
+
+def norm(X, U=None, S=None):
+
+	global Xi; Xi = X
+
+	if U is not None: X = X - U # no inplace (which can change dataset)
+	if S is not None: X = X / np.maximum(S, np.spacing(np.single(1)))
+
+	return X
 
 def redimension(Z, P, depth=1, mode='D'):
 

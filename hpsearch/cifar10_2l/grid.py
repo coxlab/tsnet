@@ -7,7 +7,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.par
 from run import main as ssnet
 from itertools import product
 
-comm_temp = '-dataset cifar10 -epoch 10 -peperr -batchsize 10 -network conv:{0},3,{1},{1}/{2},{2} mpol:{3},{3}/{4},{4} conv:{5},{0},{6},{6}/{7},{7} mpol:{8},{8}/{9},{9} -pretrain 0.5 -q'
+comm_temp = '-dataset cifar10 -epoch 10 -peperr -batchsize 10 -network norm conv:{0},3,{1},{1}/{2},{2} mpol:{3},{3}/{4},{4} norm conv:{5},{0},{6},{6}/{7},{7} mpol:{8},{8}/{9},{9} -q'
 
 for c1rf, p1rf, c2rf, p2rf in product(xrange(3,9+1,2), repeat=4):
 

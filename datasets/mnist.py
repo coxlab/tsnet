@@ -14,10 +14,10 @@ XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') / 255
 Xv = Xv.reshape(Xv.shape[0], 1, 28, 28).astype('float32') / 255
 Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') / 255
 
-Xm  = np.mean(XT, 0)[None]
-XT -= Xm
-Xv -= Xm
-Xt -= Xm
+#Xm  = np.mean(XT, 0)[None]
+#XT -= Xm
+#Xv -= Xm
+#Xt -= Xm
 
 if __name__ != '__main__':
 

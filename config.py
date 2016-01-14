@@ -44,7 +44,7 @@ import numpy as np
 
 def netinit(netspec, ds='mnist'):
 
-	if ':' not in netspec[0]: exec 'netspec = %s' % netspec[0]
+	if ':' not in ''.join(netspec): exec 'netspec = %s' % netspec[0]
 
 	net = []
 
@@ -67,12 +67,11 @@ def netinit(netspec, ds='mnist'):
 
 	## Fill Parameters
 
+	NL = [l for l in xrange(len(net)) if net[l][TYPE] == 'NORM']
 	CL = [l for l in xrange(len(net)) if net[l][TYPE] == 'CONV']
 
-	for l in CL:
-
-		net[l][PARAM] = np.random.randn(*net[l][PARAM]).astype('float32')
-		net[l]       += [None] # Bias
+	for l in NL: net[l]        += [None, None]
+	for l in CL: net[l][PARAM]  = np.random.randn(*net[l][PARAM]).astype('float32'); net[l] += [None] # Bias
 
 	return net
 

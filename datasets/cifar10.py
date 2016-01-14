@@ -31,11 +31,13 @@ Xt = batch['data'  ].reshape(-1, 3, 32, 32)
 Yt = batch['labels']; Yt = np.array(Yt)
 
 XT = XT.astype('float32') / 255
+Xv = Xv.astype('float32') / 255
 Xt = Xt.astype('float32') / 255
 
-Xm  = np.mean(XT, 0)[None]
-XT -= Xm
-Xt -= Xm
+#Xm  = np.mean(XT, 0)[None]
+#XT -= Xm
+#Xv -= Xm
+#Xt -= Xm
 
 #XT -= np.mean(XT, (1,2,3))[:,None,None,None]; XT /= np.std(XT, (1,2,3))[:,None,None,None]
 #Xt -= np.mean(Xt, (1,2,3))[:,None,None,None]; Xt /= np.std(Xt, (1,2,3))[:,None,None,None]
