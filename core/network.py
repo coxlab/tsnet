@@ -98,11 +98,9 @@ def pretrain(net, X, Y, model, mode='update'):
 			#G = np.zeros((c*(c-1)/2, c)) #for i in xrange(c): T = np.zeros((c,c)); T[:,i] = -1; T[i,:] = 1; G[:,i] = T[np.triu_indices(c,1)]
 			#G = np.sign(np.random.randn(n, c))
 
-			V = []
+			V, s = [], []
 
 			for g in xrange(G.shape[0]):
-
-				ng = len(range(n)[g::G.shape[0]])
 
 				ni = model['n'][G[g]== 1].sum()
 				nj = model['n'][G[g]==-1].sum()
@@ -110,13 +108,16 @@ def pretrain(net, X, Y, model, mode='update'):
 				Ci = (model['C'][G[g]== 1].sum(0) / ni) if ni != 0 else None
 				Cj = (model['C'][G[g]==-1].sum(0) / nj) if nj != 0 else None
 
-				Vi, si = reigh(Ci, Cj) if Ci is not None else ([0],)*2
-				Vj, sj = reigh(Cj, Ci) if Cj is not None else ([0],)*2
+				Vi, si = reigh(Ci, Cj) #if Ci is not None else ([0],)*2
+				#Vj, sj = reigh(Cj, Ci) if Cj is not None else ([0],)*2
 
-				if si[0] >= sj[0]: V += [Vi[:,:ng].T]
-				else             : V += [Vj[:,:ng].T]
+				ng = len(range(n)[g::G.shape[0]]) / 2
 
-				#V += [-V[-1]]
+				V += [Vi[:,:ng].T] #if si[0] >= sj[0] else [Vj[:,:ng].T]
+				s += [si[  :ng]  ] #if si[0] >= sj[0] else [sj[  :ng]  ]
+
+				V += [-V[-1]]
+				print('EV Group %d: %s' % (g, str(s[-1])))
 
 			V = np.vstack(V)
 			V = V.reshape((-1,) + net[-1][PARAM].shape[-3:])
