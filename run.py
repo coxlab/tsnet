@@ -132,7 +132,7 @@ def main(mainarg):
 			print('Pretraining Network Layer %d' % (l+1))
 
 			Xstat = None
-			Xstat = process(      XT, YT if l in CL else np.empty(0), Xstat, mode='pretrain', cp=[-1], net=net[:(l+1)])
+			Xstat = process(      XT, YT if l in CL else np.empty(0), Xstat, mode='pretrain', cp=[-1]+range(l+1), net=net[:(l+1)])
 			pretrain(net[:(l+1)], XT, YT if l in CL else np.empty(0), Xstat, mode='solve')
 
 		saveW(net, settings.save)

@@ -71,7 +71,7 @@ def netinit(netspec, ds='mnist'):
 	CL = [l for l in xrange(len(net)) if net[l][TYPE] == 'CONV']
 
 	for l in NL: net[l]        += [None, None]
-	for l in CL: net[l][PARAM]  = np.random.randn(*net[l][PARAM]).astype('float32'); net[l] += [None] # Bias
+	for l in CL: net[l][PARAM]  = np.random.randn(*net[l][PARAM]).astype('float32')
 
 	return net
 

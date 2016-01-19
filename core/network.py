@@ -16,12 +16,8 @@ def forward(net, X, cp=[]):
 		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'ABSL': X, Z = absl       (X, Z                 ) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
 		elif net[l][TYPE] == 'NORM': X    = norm       (X,    *net[l][PARAM:]) if net[l][EN] else  X
-		#elif net[l][TYPE] == 'MOUT': X, Z = maxout     (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
-		#elif net[l][TYPE] == 'DOUT': X, Z = dropout    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
-		#elif net[l][TYPE] == 'DRED':    Z = redimension(   Z,  net[l][PARAM ]) if net[l][EN] else     Z
 
 		else: raise TypeError('Operation in Layer {0} Undefined!'.format(str(l+1)))
 
