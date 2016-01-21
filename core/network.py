@@ -13,11 +13,14 @@ def forward(net, X, cp=[]):
 
 		if l in cp + [0]: Z = X
 
-		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, *net[l][PARAM:]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                 ) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ]) if net[l][EN] else (X, Z)
-		elif net[l][TYPE] == 'NORM': X    = norm       (X,    *net[l][PARAM:]) if net[l][EN] else  X
+		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, *net[l][PARAM:])
+		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, *net[l][PARAM:])
+		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                 )
+		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ])
+		elif net[l][TYPE] == 'NORM':
+ 
+			if l == (len(net)-1): Z = norm(Z, *net[l][PARAM:])
+			else                : X = norm(X, *net[l][PARAM:])
 
 		else: raise TypeError('Operation in Layer {0} Undefined!'.format(str(l+1)))
 
@@ -43,25 +46,36 @@ def pretrain(net, X, Y, model, mode='update'):
 			if model is None:
 
 				model      = {}
-				model['U'] = []
-				model['S'] = []
-				model['s'] = (1,) + X.shape[-3:]
+				#model['U'] = []
+				#model['S'] = []
+				model['s'] = (1,) + X.shape[1:]
+				model['U'] = np.zeros(np.prod(X.shape[1:]), dtype='float32')
+				model['S'] = np.zeros(np.prod(X.shape[1:]), dtype='float32')
+				model['n'] = np.zeros(1, dtype='float32')
 
-			X = X.reshape(X.shape[0], -1)
+			n = X.shape[0]
+			X = X.reshape(n, -1)
 
-			model['U'] += [np.mean(X, 0)[:,None]]
-			model['S'] += [np.var (X, 0)[:,None]]
+			U = model['U'] + (np.sum(X, 0) - n * model['U']) / (model['n'] + n)
+			S = model['S'] +  np.sum(np.square(X), 0) - (model['n'] + n) * np.square(U) + model['n'] * np.square(model['U'])
+
+			model['U']  = U
+			model['S']  = S
+			model['n'] += n
+
+			#model['U'] += [np.mean(X, 0)[:,None]]
+			#model['S'] += [np.var (X, 0)[:,None]]
 
 			return model
 
 		elif mode == 'solve':
 
-			model['U']  = np.hstack(model['U'])
-			model['S']  = np.hstack(model['S'])
-			model['S'] += np.square(model['U'] - np.mean(model['U'], 1)[:,None])
-			model['U']  = np.mean(model['U'], 1)
-			model['S']  = np.mean(model['S'], 1)
-			model['S']  = np.sqrt(model['S']   )
+			#model['U']  = np.hstack(model['U'])
+			#model['S']  = np.hstack(model['S'])
+			#model['S'] += np.square(model['U'] - np.mean(model['U'], 1)[:,None])
+			#model['U']  = np.mean(model['U'], 1)
+			#model['S']  = np.mean(model['S'], 1)
+			#model['S']  = np.sqrt(model['S']   )
 
 			net[-1][PARAM]   = model['U'].reshape(model['s'])
 			#net[-1][PARAM+1] = model['S'].reshape(model['s'])
@@ -125,18 +139,6 @@ def pretrain(net, X, Y, model, mode='update'):
 			net[-1][PARAM][:V.shape[0]] = V
 
 ## Extra Tools
-
-def disable(net, lt):
-
-	for l in xrange(len(net)):
-
-		if net[l][TYPE] == lt: net[l][EN] = False
-
-def enable(net, lt):
-
-	for l in xrange(len(net)):
-
-		if net[l][TYPE] == lt: net[l][EN] = True
 
 import os
 from scipy.io import savemat, loadmat
