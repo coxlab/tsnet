@@ -1,158 +1,49 @@
 import numpy as np
-from itertools import product
-from scipy.linalg import eigh
 from core.layers import *
-from config import TYPE, EN, PARAM
-
-## Feedforward Function
-
-#@profile
-def forward(net, X, cp=[]):
-
-	for l in xrange(len(net)):
-
-		if l in cp + [0]: Z = X
-
-		if   net[l][TYPE] == 'CONV': X, Z = convolution(X, Z, *net[l][PARAM:])
-		elif net[l][TYPE] == 'MPOL': X, Z = maxpooling (X, Z, *net[l][PARAM:])
-		elif net[l][TYPE] == 'RELU': X, Z = relu       (X, Z                 )
-		elif net[l][TYPE] == 'PADD': X, Z = padding    (X, Z,  net[l][PARAM ])
-		elif net[l][TYPE] == 'NORM':
- 
-			if l == (len(net)-1): Z = norm(Z, *net[l][PARAM:])
-			else                : X = norm(X, *net[l][PARAM:])
-
-		else: raise TypeError('Operation in Layer {0} Undefined!'.format(str(l+1)))
-
-	if         -1 in cp: return getXi()
-	elif len(net) in cp: return X
-	else               : return Z
-
-## Pretraining
-
-def reigh(Ca, Cb):
-
-	if Cb is None: s, V = eigh(Ca)
-	else         : s, V = eigh(Ca, Cb + (np.trace(Cb) / Cb.shape[0]) * np.eye(*Cb.shape, dtype='float32'))
-
-	return V[:,::-1], s[::-1]
-
-def pretrain(net, X, Y, model, mode='update'):
-
-	if Y.shape[0] == 0: # NORM
-
-		if mode == 'update':
-
-			if model is None:
-
-				model      = {}
-				#model['U'] = []
-				#model['S'] = []
-				model['s'] = (1,) + X.shape[1:]
-				model['U'] = np.zeros(np.prod(X.shape[1:]), dtype='float32')
-				model['S'] = np.zeros(np.prod(X.shape[1:]), dtype='float32')
-				model['n'] = np.zeros(1, dtype='float32')
-
-			n = X.shape[0]
-			X = X.reshape(n, -1)
-
-			U = model['U'] + (np.sum(X, 0) - n * model['U']) / (model['n'] + n)
-			S = model['S'] +  np.sum(np.square(X), 0) - (model['n'] + n) * np.square(U) + model['n'] * np.square(model['U'])
-
-			model['U']  = U
-			model['S']  = S
-			model['n'] += n
-
-			#model['U'] += [np.mean(X, 0)[:,None]]
-			#model['S'] += [np.var (X, 0)[:,None]]
-
-			return model
-
-		elif mode == 'solve':
-
-			#model['U']  = np.hstack(model['U'])
-			#model['S']  = np.hstack(model['S'])
-			#model['S'] += np.square(model['U'] - np.mean(model['U'], 1)[:,None])
-			#model['U']  = np.mean(model['U'], 1)
-			#model['S']  = np.mean(model['S'], 1)
-			#model['S']  = np.sqrt(model['S']   )
-
-			net[-1][PARAM]   = model['U'].reshape(model['s'])
-			#net[-1][PARAM+1] = model['S'].reshape(model['s'])
-
-	else: # CONV
-
-		if mode == 'update':
-
-			if model is None:
-
-				model      = {}
-				model['C'] = np.zeros((Y.shape[1],) + (np.prod(X.shape[-3:]),)*2, dtype='float32')
-				model['n'] = np.zeros( Y.shape[1]                               , dtype='float32')
-
-			for c in xrange(Y.shape[1]):
-
-				Xt = X[Y[:,c]==1].reshape(-1, np.prod(X.shape[-3:]))
-				model['C'][c] += np.dot(Xt.T, Xt)
-				model['n'][c] += np.sum(Y[:,c]==1)
-
-			return model
-
-		elif mode == 'solve':
-
-			c = model['C'].shape[0]
-			n = net[-1][PARAM].shape[0]
-
-			#G = np.ones((1, c))
-			G = np.eye(c)*2 - 1
-			#G = np.zeros((c*(c-1)/2, c)) #for i in xrange(c): T = np.zeros((c,c)); T[:,i] = -1; T[i,:] = 1; G[:,i] = T[np.triu_indices(c,1)]
-			#G = np.sign(np.random.randn(n, c))
-
-			V, s = [], []
-
-			for g in xrange(G.shape[0]):
-
-				ni = model['n'][G[g]== 1].sum()
-				nj = model['n'][G[g]==-1].sum()
-
-				Ci = (model['C'][G[g]== 1].sum(0) / ni) if ni != 0 else None
-				Cj = (model['C'][G[g]==-1].sum(0) / nj) if nj != 0 else None
-
-				Vi, si = reigh(Ci, Cj) #if Ci is not None else ([0],)*2
-				#Vj, sj = reigh(Cj, Ci) if Cj is not None else ([0],)*2
-
-				ng = len(range(n)[g::G.shape[0]]) / 2
-
-				V += [Vi[:,:ng].T] #if si[0] >= sj[0] else [Vj[:,:ng].T]
-				s += [si[  :ng]  ] #if si[0] >= sj[0] else [sj[  :ng]  ]
-
-				V += [-V[-1]]
-				print('EV Group %d: %s' % (g, str(s[-1])))
-
-			V = np.vstack(V)
-			V = V.reshape((-1,) + net[-1][PARAM].shape[-3:])
-
-			#V = V[:np.ceil(V.shape[0] * ratio)]
-			#P = np.random.randn(n, V.shape[0]).astype('float32')
-			#V = np.tensordot(P, V, [(1,),(0,)])
-
-			net[-1][PARAM][:V.shape[0]] = V
-
-## Extra Tools
 
 import os
 from scipy.io import savemat, loadmat
 
-def saveW(net, fn):
+class NET():
 
-	if not fn: return
+	def __init__(self, hp):
 
-	if os.path.isfile(fn): W = loadmat(fn)['W']
-	else                 : W = np.zeros(0, dtype=np.object)
+		self.layer = []
 
-	for l in xrange(len(net)):
+		for l in xrange(len(hp)):
 
-		if net[l][TYPE] == 'CONV': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = net[l][PARAM]
+			if   hp[l][0] == 'NORM': self.layer += [NORM(*hp[l][1:])]
+			elif hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]
+			elif hp[l][0] == 'MPOL': self.layer += [MPOL(*hp[l][1:])]
+			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
+			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
 
-	savemat(fn, {'W':W}, appendmat=False)
+			else: raise TypeError('Undefined Type in Layer {0}!'.format(str(l+1)))
+
+	def forward(self, X, L=None):
+
+		L = len(self.layer) if L is None else L
+		Z = np.copy(X)
+
+		for l in xrange(L): X, Z = self.layer[l].forward(X, Z)
+
+		return Z
+
+	def pretrain(self, Y, L, mode):
+
+		if mode == 'update': self.layer[L-1].update(Y)
+		else               : self.layer[L-1].solve()
+
+	def save(self, fn):
+
+		if not fn: return
+
+		if os.path.isfile(fn): W = loadmat(fn)['W']
+		else                 : W = np.zeros(0, dtype=np.object)
+
+		for l in xrange(len(self.layer)):
+
+			if self.layer[l].__class__.__name__ == 'CONV': W = np.append(W, np.zeros(1, dtype=np.object)); W[-1] = self.layer[l].W
+
+		savemat(fn, {'W':W}, appendmat=False)
 

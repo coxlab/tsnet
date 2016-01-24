@@ -2,6 +2,7 @@ import numpy as np
 import numexpr as ne
 from skimage.util.shape import view_as_windows
 from numpy.lib.stride_tricks import as_strided
+from scipy.linalg import eigh
 
 ## Basic Tools
 
@@ -42,73 +43,192 @@ def indices(shape): # memory efficient np.indices
 	for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
 	return I
 
-## Standard Layers
+def reigh(Ci, Cj):
 
-Xi = []
-def getXi(): return Xi
+	if Cj is None: s, V = eigh(Ci)
+	else         : s, V = eigh(Ci, Cj + (np.trace(Cj) / Cj.shape[0]) * np.eye(*Cj.shape, dtype='float32'))
 
-def convolution(X, Z, W, s, EXPANSION=True):
+	return V[:,::-1], s[::-1]
 
-	X = view(X, (1,)+W.shape[1:]).squeeze(4)
-	Z = view(Z, (1,)+W.shape[1:]).squeeze(4)
+## Layers
 
-	X = striding(X, s) if s is not None else X
-	Z = striding(Z, s) if s is not None else Z
+class NORM:
 
-	global Xi; Xi = X
+	def __init__(self, eX, eZ):
 
-	X = dot(X.squeeze(1), W)
-	Z = dot(Z.squeeze(1), W) if not EXPANSION else Z # np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION
+		self.e = [eX, eZ]
+		self.U = [None, None]
+		self.S = [None, None]
+		self.n = [ 0,  0]
+		self.I = [[], []]
+		self.s = [[], []]
 
-	return X, Z
+	def forward(self, X, Z):
 
-def maxpooling(X, Z, w, s):
+		if self.e[0][0]: self.I[0] = X
+		else:
+			if self.U[0] is not None: X = X - self.U[0]
+			if self.S[0] is not None: X = X / np.maximum(self.S[0], np.single(1e-3)) # np.spacing(np.single(1))
 
-	X = view(X, (1,1)+tuple(w)).squeeze((4,5))
-	Z = view(Z, (1,1)+tuple(w)).squeeze((4,5))
+		if self.e[1][0]: self.I[1] = Z
+		else:
+			if self.U[1] is not None: Z = Z - self.U[1]
+			if self.S[1] is not None: Z = Z / np.maximum(self.S[1], np.single(1e-3))
 
-	X = striding(X, s) if s is not None else X
-	Z = striding(Z, s) if s is not None else Z
+		return X, Z
 
-	Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
+	def update(self, _):
 
-	I = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(w))
+		for i in xrange(2):
 
-	X = X[I]
-	Z = Z[I]
-	
-	return X, Z
+			if self.e[i][0]:
 
-def relu(X, Z):
+				self.s[i] = (1,) + self.I[i].shape[1:]
+				n         = self.I[i].shape[0]
+				self.I[i] = self.I[i].reshape(n, -1)
 
-	Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
+				self.U[i] = np.zeros(self.I[i].shape[1], dtype='float32') if self.U[i] is None else self.U[i]
+				U         = self.U[i] + (np.sum(self.I[i], 0) - n * self.U[i]) / (self.n[i] + n)
 
-	I = X <= 0
-	X = ne.evaluate('where(I, 0, X)', order='C')
+				if self.e[i][1]:
 
-	I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
-	Z = ne.evaluate('where(I, 0, Z)', order='C')
+					self.S[i]  = np.zeros(self.I[i].shape[1], dtype='float32') if self.S[i] is None else self.S[i]
+					self.S[i] += np.sum(np.square(self.I[i]), 0) - (self.n[i] + n) * np.square(U) + self.n[i] * np.square(self.U[i])
 
-	return X, Z
+				self.U[i]  = U
+				self.n[i] += n
 
-def padding(X, Z, p):
+	def solve(self):
 
-        p = [0,0] * 2 + p
-        X = np.pad(X, zip(p[0::2], p[1::2]), 'constant')
+		for i in xrange(2):
+			
+			if self.e[i][0]: self.U[i] = self.U[i].reshape(self.s[i])
+			if self.e[i][1]: self.S[i] = self.S[i].reshape(self.s[i]); self.S[i] = np.sqrt(self.S[i] / self.n[i])
 
-        p = p + [0,0] * (Z.ndim - X.ndim)
-        Z = np.pad(Z, zip(p[0::2], p[1::2]), 'constant')
+		self.e = [[0, 0], [0, 0]]
 
-        return X, Z
+class CONV:
 
-## Special Layers
+	def __init__(self, w, s, e, l):
 
-def norm(X, U=None, S=None):
+		self.W = np.random.randn(*w).astype('float32')
+		self.s = s
+		self.e = e
 
-	global Xi; Xi = X
+		self.l = l
+		self.C = None
+		self.n = None
 
-	if U is not None: X = X - U # no inplace (which can change dataset)
-	if S is not None: X = X / np.maximum(S, np.spacing(np.single(1)))
+	def forward(self, X, Z):
 
-	return X
+		X = view(X, (1,)+self.W.shape[1:]).squeeze(4)
+		Z = view(Z, (1,)+self.W.shape[1:]).squeeze(4)
+
+		X = striding(X, self.s)
+		Z = striding(Z, self.s)
+
+		if self.l: self.XE = X
+
+		X = dot(X.squeeze(1), self.W)
+		Z = dot(Z.squeeze(1), self.W) if not self.e else Z # np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION
+
+		return X, Z
+
+	def update(self, Y):
+
+		if self.C is None: self.C = np.zeros((Y.shape[1],) + (np.prod(self.XE.shape[-3:]),)*2, dtype='float32')
+		if self.n is None: self.n = np.zeros( Y.shape[1]                                     , dtype='float32')
+		
+		for c in xrange(Y.shape[1]):
+			
+			XT = self.XE[Y[:,c]==1].reshape(-1, np.prod(self.XE.shape[-3:]))
+			self.C[c] += np.dot(XT.T, XT)
+			self.n[c] += np.sum(Y[:,c]==1)
+			
+	def solve(self):
+		
+		c = self.C.shape[0]
+		n = self.W.shape[0]
+
+		G = np.eye(c)*2 - 1
+		V, s = [], []
+
+		for g in xrange(G.shape[0]):
+
+			ni = self.n[G[g]== 1].sum()
+			nj = self.n[G[g]==-1].sum()
+
+			Ci = (self.C[G[g]== 1].sum(0) / ni) if ni != 0 else None
+			Cj = (self.C[G[g]==-1].sum(0) / nj) if nj != 0 else None
+
+			Vi, si = reigh(Ci, Cj) #if Ci is not None else ([0],)*2
+			#Vj, sj = reigh(Cj, Ci) if Cj is not None else ([0],)*2
+
+			ng = len(range(n)[g::G.shape[0]]) / 2
+
+			V += [Vi[:,:ng].T] #if si[0] >= sj[0] else [Vj[:,:ng].T]
+			s += [si[  :ng]  ] #if si[0] >= sj[0] else [sj[  :ng]  ]
+
+			V += [-V[-1]]
+			print('EV Group %d: %s' % (g, str(s[-1])))
+
+		V = np.vstack(V)
+		V = V.reshape((-1,) + self.W.shape[-3:])
+
+		self.W[:V.shape[0]] = V
+		self.l              = 0
+
+class MPOL:
+
+	def __init__(self, w, s): 
+
+		self.w = w
+		self.s = s
+
+	def forward(self, X, Z):
+
+		X = view(X, (1,1)+tuple(self.w)).squeeze((4,5))
+		Z = view(Z, (1,1)+tuple(self.w)).squeeze((4,5))
+
+		X = striding(X, self.s)
+		Z = striding(Z, self.s)
+
+		Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
+
+		I = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(self.w))
+
+		X = X[I]
+		Z = Z[I]
+
+		return X, Z
+
+class RELU:
+
+	def forward(self, X, Z):
+
+		Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
+
+		I = X <= 0
+		X = ne.evaluate('where(I, 0, X)', order='C')
+
+		I = I.reshape(I.shape + (1,)*(Z.ndim-X.ndim))
+		Z = ne.evaluate('where(I, 0, Z)', order='C')
+
+		return X, Z
+
+class PADD:
+
+	def __init__(self, p): 
+
+		self.p = p
+
+	def forward(self, X, Z):
+
+		p = [0,0] * 2 + self.p
+        	X = np.pad(X, zip(p[0::2], p[1::2]), 'constant')
+
+	        p = p + [0,0] * (Z.ndim - X.ndim)
+        	Z = np.pad(Z, zip(p[0::2], p[1::2]), 'constant')
+
+        	return X, Z
 

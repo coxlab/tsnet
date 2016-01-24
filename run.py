@@ -19,10 +19,10 @@ def main(mainarg):
 
 	## Load Network
 
-	net = netinit(settings.network, settings.dataset); saveW(net, settings.save)
-	NL = [l for l in xrange(len(net)) if net[l][TYPE] == 'NORM']
-	CL = [l for l in xrange(len(net)) if net[l][TYPE] == 'CONV']
-	cp = [] if 0 not in NL else [1]
+	net = NET(parsehp(settings.network, settings.pretrain)); net.save(settings.save)
+
+	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM']
+	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV']
 
 	## Load Dataset
 
@@ -40,21 +40,22 @@ def main(mainarg):
 
 	if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lcalg]
 
-	if   settings.lcalg == 0: from classifier.exact   import Linear, update, solve, infer; lcarg = ()
-	elif settings.lcalg == 1: from classifier.lowrank import Linear, update, solve, infer; lcarg = (settings.lcparam[0],);  settings.lcparam = settings.lcparam[1:]
-	else                    : from classifier.asgd    import Linear, update, solve, infer; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+	if   settings.lcalg == 0: from classifier.exact import Linear, update, solve, infer; lcarg = ()
+	else                    : from classifier.asgd  import Linear, update, solve, infer; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
-	settings.peperr &= (settings.lcalg == 2)
+	settings.peperr &= (settings.lcalg == 1)
 
 	if   settings.mcalg == 0: from classifier.formatting import ovr ; enc, dec = ovr ()
 	elif settings.mcalg == 1: from classifier.formatting import ovo ; enc, dec = ovo ()
 	else                    : from classifier.formatting import ecoc; enc, dec = ecoc()
 
+	classifier = Linear(*lcarg)
+
 	## Check Memory Usage
 
 	if settings.limit >= 0:
 
-		usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], forward, settings.batchsize, enc(0, NC)) / 1024.0**2
+		usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], settings.batchsize, enc(0, NC)) / 1024.0**2
 
 		print('Estimated Memory Usage = %.2f MB' % usage)
 		if usage > settings.limit > 0: raise MemoryError('Over Limit!')
@@ -62,7 +63,7 @@ def main(mainarg):
 	## Define Epoch
 
 	#@profile
-	def process(X, Y, model, mode='train', aug=None, cp=cp, net=net):
+	def process(X, Y, mode='train', aug=None):
 
 		smp = err = 0; #global Zs
 
@@ -72,30 +73,29 @@ def main(mainarg):
 
 				Xb = X[i:i+settings.batchsize]; smp += Xb.shape[0]
 				Yb = Y[i:i+settings.batchsize]
-				Xb = aug(Xb) if aug is not None else Xb
+				Xb = aug(Xb) if aug is not None else np.copy(Xb)
 
 				if mode == 'pretrain':
 
-					Xi    = forward(net, Xb, cp)
-					Yi    = enc(Yb, NC) if Yb.shape[0] > 0 else Yb
-					model = pretrain(net, Xi, Yi, model, mode='update')
+					net.forward (Xb,          net.pL               )
+					net.pretrain(enc(Yb, NC), net.pL, mode='update')
 
 				elif mode == 'train':
 
-					Zb = forward(net, Xb, cp)
+					Zb = net.forward(Xb)
 					#Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
-					update(model, Zb, enc(Yb, NC))
-					err += np.count_nonzero(dec(model.tif, NC) != Yb) if settings.peperr else 0
+					update(classifier, Zb, enc(Yb, NC))
+					err += np.count_nonzero(dec(classifier.tif, NC) != Yb) if settings.peperr else 0
 
 				elif mode == 'test':
 
-					Zb = forward(net, Xb, cp)
+					Zb = net.forward(Xb)
 					#Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
-					err += np.count_nonzero(dec(infer(model, Zb), NC) != Yb)
+					err += np.count_nonzero(dec(infer(classifier, Zb), NC) != Yb)
 
 				if not settings.quiet:
 
@@ -112,8 +112,9 @@ def main(mainarg):
 
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
 
-		if mode == 'test': return err
-		else             : return model
+		if   mode == 'pretrain': net.pretrain(None, net.pL, mode='solve')
+		elif mode == 'train'   : pass
+		elif mode == 'test'    : return err
 
 	## Start
 
@@ -129,32 +130,25 @@ def main(mainarg):
 
 		for l in sorted(NL + CL):
 
-			print('Pretraining Network Layer %d' % (l+1))
+			print('Pretraining Network Layer %d' % (l+1)); net.pL = l+1
+			process(XT, YT, mode='pretrain')
 
-			Xstat = None
-			Xstat = process(      XT, YT if l in CL else np.empty(0), Xstat, mode='pretrain', cp=[-1]+range(l+1), net=net[:(l+1)])
-			pretrain(net[:(l+1)], XT, YT if l in CL else np.empty(0), Xstat, mode='solve')
-
-		saveW(net, settings.save)
+		net.save(settings.save)
 		print('-' * 55 + ' ' + time.ctime())
 
 	## Training
-
-	classifier = Linear(*lcarg)
-	#settings.lrnrate = np2param(settings.lrnrate)
 
 	for n in xrange(settings.epoch):
 
 		print('Training Epoch %d/%d' % (n+1, settings.epoch))
 
 		XT, YT = shuffle(XT, YT)
-
-		process(XT, YT, classifier, aug=aug)
+		process(XT, YT, aug=aug)
 
 		if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
 
-			if Xv.shape[0] > 0: val = process(Xv, Yv, classifier, mode='test'); print('VAL Error = %d' % val)
-			if Xt.shape[0] > 0: tst = process(Xt, Yt, classifier, mode='test'); print('TST Error = %d' % tst)
+			if Xv.shape[0] > 0: val = process(Xv, Yv, mode='test'); print('VAL Error = %d' % val)
+			if Xt.shape[0] > 0: tst = process(Xt, Yt, mode='test'); print('TST Error = %d' % tst)
 
 			if val < bval: bval = val
 			if tst < btst: btst = tst
@@ -169,10 +163,10 @@ def main(mainarg):
 
 		solve(classifier, settings.lcparam[p])
 
-		print(                                                                     '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
-		if settings.trnerr:                                                  print('TRN Error = %d' % process(XT, YT, classifier, mode='test'))
-		if Xv.shape[0] > 0: fval = process(Xv, Yv, classifier, mode='test'); print('VAL Error = %d' % fval)
-		if Xt.shape[0] > 0: ftst = process(Xt, Yt, classifier, mode='test'); print('TST Error = %d' % ftst)
+		print(                                                         '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
+		if settings.trnerr:                                      print('TRN Error = %d' % process(XT, YT, mode='test'))
+		if Xv.shape[0] > 0: fval = process(Xv, Yv, mode='test'); print('VAL Error = %d' % fval)
+		if Xt.shape[0] > 0: ftst = process(Xt, Yt, mode='test'); print('TST Error = %d' % ftst)
 
 		if fval < bval: bval = fval
 		if ftst < btst: btst = ftst
