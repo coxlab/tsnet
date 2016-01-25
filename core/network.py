@@ -6,17 +6,17 @@ from scipy.io import savemat, loadmat
 
 class NET():
 
-	def __init__(self, hp):
+	def __init__(self, hp, ch):
 
 		self.layer = []
 
 		for l in xrange(len(hp)):
 
-			if   hp[l][0] == 'NORM': self.layer += [NORM(*hp[l][1:])]
-			elif hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]
-			elif hp[l][0] == 'MPOL': self.layer += [MPOL(*hp[l][1:])]
-			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
-			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
+			if   hp[l][0] == 'NORM':                                    self.layer += [NORM(*hp[l][1:])]
+			elif hp[l][0] == 'CONV': hp[l][1][1], ch = ch, hp[l][1][0]; self.layer += [CONV(*hp[l][1:])]
+			elif hp[l][0] == 'MPOL':                                    self.layer += [MPOL(*hp[l][1:])]
+			elif hp[l][0] == 'RELU':                                    self.layer += [RELU(          )]
+			elif hp[l][0] == 'PADD':                                    self.layer += [PADD(*hp[l][1:])]
 
 			else: raise TypeError('Undefined Type in Layer {0}!'.format(str(l+1)))
 

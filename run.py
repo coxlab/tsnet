@@ -18,13 +18,6 @@ def main(mainarg):
 	settings.peperr  &= (settings.lcalg == 1)
 	settings.pretrain = 0 if settings.mcalg != 0 else settings.pretrain
 
-	## Load Network
-
-	net = NET(parsehp(settings.network, settings.pretrain)); net.save(settings.save)
-
-	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM']
-	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV']
-
 	## Load Dataset
 
 	if   settings.dataset == 'mnist'  : from datasets.mnist   import XT, YT, Xv, Yv, Xt, Yt, NC, aug
@@ -37,6 +30,13 @@ def main(mainarg):
 		else                     : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]] 
 
 	if settings.noaug: aug = None
+
+	## Load Network
+
+	net = NET(parsehp(settings.network, settings.pretrain), XT.shape[1]); net.save(settings.save)
+
+	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM']
+	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV']
 
 	## Load Classifier
 
@@ -130,7 +130,9 @@ def main(mainarg):
 		for l in sorted(NL + CL):
 
 			print('Pretraining Network Layer %d' % (l+1)); net.pL = l+1
-			process(XT, YT, mode='pretrain')
+
+			XT, YT = shuffle(XT, YT); pN = XT.shape[0] * settings.pretrain
+			process(XT[:pN], YT[:pN], mode='pretrain')
 
 		net.save(settings.save)
 		print('-' * 55 + ' ' + time.ctime())

@@ -6,12 +6,12 @@ LC_DEFAULT      = [EXACT_DEFAULT, ASGD_DEFAULT]
 
 import argparse; parser = argparse.ArgumentParser()
 
-parser.add_argument('-network', default=['mnist_1l'], nargs='*')
 parser.add_argument('-dataset', default='mnist')
+parser.add_argument('-network', default=['mnist_1l'], nargs='*')
 
 parser.add_argument('-epoch'    , type=int  , default=1  )
 parser.add_argument('-batchsize', type=int  , default=50 )
-parser.add_argument('-pretrain' , type=float, default=0.5)
+parser.add_argument('-pretrain' , type=float, default=0.1)
 
 parser.add_argument('-lcalg'  , type=int  , default=1                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
@@ -29,8 +29,12 @@ parser.add_argument('-limit', type=int, default=0            )
 
 ## Network Examples
 
-mnist_1l = ['norm:1,0/1,0', 'conv:100,1,7,7/1,1/1', 'mpol:7,7/4,4', 'relu']
-mnist_2l = ['norm:1,0/1,0', 'conv:40,1,7,7/1,1/1' , 'mpol:3,3/2,2', 'relu', 'norm:1,0/0,0', 'conv:40,40,3,3/1,1/1', 'mpol:3,3/2,2', 'relu']
+mnist_1l = ['norm:1,0/1,0', 'conv:100,0,7,7/1,1/1', 'mpol:7,7/4,4', 'relu']
+mnist_2l = ['norm:1,0/1,0', 'conv:40,0,7,7/1,1/1' , 'mpol:3,3/2,2', 'relu', 'norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu']
+
+#nin       = ['norm:1,0/0,0', 'conv:60,80,1,1/1,1/0', 'relu']
+conv3      = ['norm:1,0/1,0', 'padd:1,1,1,1', 'conv:40,0,3,3/1,1/0', 'relu']
+mnist_deep = ['norm:1,0/0,0', 'conv:40,0,7,7/1,1/1', 'mpol:3,3/2,2', 'relu'] + conv3 * 2 + ['norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu'] + ['norm:0,0/1,0']
 
 ## Network Hyperparameter Parsing
 
