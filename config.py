@@ -66,7 +66,7 @@ def memest(net, dataset, bsiz, mccode):
 
 	usage  = 0
 	usage += sum([item .nbytes for item  in dataset]) # Dataset
-	#usage += sum([param.nbytes for layer in net.layer for param in dir(layer) if hasattr(layer[param], 'nbytes')]) # Network Parameters
+	usage += sum([getattr(layer, param).nbytes for layer in net.layer for param in dir(layer) if hasattr(getattr(layer, param), 'nbytes')]) # Network Parameters
 
 	batch  = net.forward(dataset[0][:bsiz]); print('Dim(Z) = %s' % str(batch.shape[1:]))
 	batch  = batch.reshape(bsiz, -1)

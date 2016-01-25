@@ -5,6 +5,9 @@ import numexpr as ne
 
 one = np.ones(1, dtype='float32')
 
+def nescale(X, a   ): ne.evaluate('a * X'    , out=X)
+def newtsum(Y, a, X): ne.evaluate('a * X + Y', out=Y)
+
 class Linear():
 
 	def __init__(self, l2r, ss, t0): 
@@ -17,40 +20,31 @@ class Linear():
 		self.tWZ, self.tss = None, self.ss0
 		self. WZ, self. ss = None, one
 
-def nescale(X, a   ): ne.evaluate('a * X'    , out=X)
-def newtsum(Y, a, X): ne.evaluate('a * X + Y', out=Y)
+	def update(self, Z, Y):
 
-#@profile
-def update(model, Z, Y):
+		if self.WZ is None:
 
-	if model.WZ is None:
+			self.tWZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
+			self. WZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
+			self.cch = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
+			self.tif = np.zeros((Z.shape[0],Y.shape[1]), dtype='float32')
 
-		model.tWZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
-		model. WZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
-		model.cch = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
-		model.tif = np.zeros((Z.shape[0],Y.shape[1]), dtype='float32')
+		D = np.dot(Z, self.tWZ, out=self.tif) * Y
+		D = (D < 1) * Y
 
-	D = np.dot(Z, model.tWZ, out=model.tif) * Y
-	D = (D < 1) * Y
+		nescale(self.tWZ, one - self.tss * self.l2r)
+		nescale(self. WZ, one - self. ss)
+		newtsum(self.tWZ, self.tss, np.dot(Z.T, D, out=self.cch))
+		newtsum(self. WZ, self. ss, self.tWZ)
 
-	#model.tWZ *= 1 - model.tss * model.l2r
-	#model. WZ *= 1 - model. ss
-	#model.tWZ += model.tss * np.dot(Z.T, D, out=model.cch)
-	#model. WZ += model. ss * model.tWZ
+		self.t   += 1
+		self.tss  = self.ss0 / (1 + self.ss0 * self.l2r * self.t) ** (2.0/3)
+		self. ss  = 1.0 / max(self.t - self.t0, one)
 
-	nescale(model.tWZ, one - model.tss * model.l2r)
-	nescale(model. WZ, one - model. ss)
-	newtsum(model.tWZ, model.tss, np.dot(Z.T, D, out=model.cch))
-	newtsum(model. WZ, model. ss, model.tWZ)
+	def solve(self, _):
 
-	model.t   += 1
-	model.tss  = model.ss0 / (1 + model.ss0 * model.l2r * model.t) ** (2.0/3)
-	model. ss  = 1.0 / max(model.t - model.t0, one)
+		pass
 
-def solve(model, _):
+	def infer(self, Z):
 
-	pass
-
-def infer(model, Z):
-
-	return np.dot(Z, model.WZ)
+		return np.dot(Z, self.WZ)

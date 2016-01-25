@@ -1,13 +1,11 @@
 from __future__ import print_function
 
 import sys, time, importlib
-import warnings; warnings.filterwarnings("ignore")
+import warnings; warnings.filterwarnings('ignore')
 import math, numpy as np
 
 from config import *
 from core.network import *
-
-#Zs = ()
 
 def main(mainarg):
 
@@ -16,6 +14,9 @@ def main(mainarg):
 	## Load Settings
 
 	settings = parser.parse_args(mainarg); np.random.seed(settings.seed)
+
+	settings.peperr  &= (settings.lcalg == 1)
+	settings.pretrain = 0 if settings.mcalg != 0 else settings.pretrain
 
 	## Load Network
 
@@ -26,8 +27,9 @@ def main(mainarg):
 
 	## Load Dataset
 
-	ds = importlib.import_module('datasets.%s' % settings.dataset)
-	XT, YT, Xv, Yv, Xt, Yt, NC, aug = ds.get()
+	if   settings.dataset == 'mnist'  : from datasets.mnist   import XT, YT, Xv, Yv, Xt, Yt, NC, aug
+	elif settings.dataset == 'cifar10': from datasets.cifar10 import XT, YT, Xv, Yv, Xt, Yt, NC, aug
+
 	def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
 	if settings.fast:
@@ -40,14 +42,12 @@ def main(mainarg):
 
 	if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lcalg]
 
-	if   settings.lcalg == 0: from classifier.exact import Linear, update, solve, infer; lcarg = ()
-	else                    : from classifier.asgd  import Linear, update, solve, infer; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+	if   settings.lcalg == 0: from classifier.exact import Linear; lcarg = ()
+	elif settings.lcalg == 1: from classifier.asgd  import Linear; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
-	settings.peperr &= (settings.lcalg == 1)
-
-	if   settings.mcalg == 0: from classifier.formatting import ovr ; enc, dec = ovr ()
-	elif settings.mcalg == 1: from classifier.formatting import ovo ; enc, dec = ovo ()
-	else                    : from classifier.formatting import ecoc; enc, dec = ecoc()
+	if   settings.mcalg == 0: from classifier.formatting import ovr ; enc, dec = ovr (NC)
+	elif settings.mcalg == 1: from classifier.formatting import ovo ; enc, dec = ovo (NC)
+	elif settings.mcalg == 2: from classifier.formatting import ecoc; enc, dec = ecoc(NC)
 
 	classifier = Linear(*lcarg)
 
@@ -55,17 +55,16 @@ def main(mainarg):
 
 	if settings.limit >= 0:
 
-		usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], settings.batchsize, enc(0, NC)) / 1024.0**2
+		usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], settings.batchsize, enc(0)) / 1024.0**2
 
 		print('Estimated Memory Usage = %.2f MB' % usage)
 		if usage > settings.limit > 0: raise MemoryError('Over Limit!')
 
 	## Define Epoch
 
-	#@profile
 	def process(X, Y, mode='train', aug=None):
 
-		smp = err = 0; #global Zs
+		smp = err = 0
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
 
@@ -73,12 +72,12 @@ def main(mainarg):
 
 				Xb = X[i:i+settings.batchsize]; smp += Xb.shape[0]
 				Yb = Y[i:i+settings.batchsize]
-				Xb = aug(Xb) if aug is not None else np.copy(Xb)
+				Xb = aug(Xb) if aug is not None else Xb
 
 				if mode == 'pretrain':
 
 					net.forward (Xb,          net.pL               )
-					net.pretrain(enc(Yb, NC), net.pL, mode='update')
+					net.pretrain(enc(Yb), net.pL, mode='update')
 
 				elif mode == 'train':
 
@@ -86,8 +85,8 @@ def main(mainarg):
 					#Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
-					update(classifier, Zb, enc(Yb, NC))
-					err += np.count_nonzero(dec(classifier.tif, NC) != Yb) if settings.peperr else 0
+					classifier.update(Zb, enc(Yb))
+					err += np.count_nonzero(dec(classifier.tif) != Yb) if settings.peperr else 0
 
 				elif mode == 'test':
 
@@ -95,7 +94,7 @@ def main(mainarg):
 					#Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
-					err += np.count_nonzero(dec(infer(classifier, Zb), NC) != Yb)
+					err += np.count_nonzero(dec(classifier.infer(Zb)) != Yb)
 
 				if not settings.quiet:
 
@@ -161,7 +160,7 @@ def main(mainarg):
 
 		print('Testing Classifier (p = %.2f)' % settings.lcparam[p])
 
-		solve(classifier, settings.lcparam[p])
+		classifier.solve(settings.lcparam[p])
 
 		print(                                                         '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
 		if settings.trnerr:                                      print('TRN Error = %d' % process(XT, YT, mode='test'))
