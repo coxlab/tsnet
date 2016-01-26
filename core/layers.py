@@ -3,6 +3,7 @@ import numexpr as ne
 from skimage.util.shape import view_as_windows
 from numpy.lib.stride_tricks import as_strided
 from scipy.linalg import eigh
+from scipy.linalg.blas import ssyrk
 
 ## Basic Tools
 
@@ -136,17 +137,22 @@ class CONV:
 
 	def update(self, Y):
 
-		if self.C is None: self.C = np.zeros((Y.shape[1],) + (np.prod(self.XE.shape[-3:]),)*2, dtype='float32')
-		if self.n is None: self.n = np.zeros( Y.shape[1]                                     , dtype='float32')
-		
+		if self.C is None: self.C = np.zeros((np.prod(self.XE.shape[-3:]),)*2 + (Y.shape[1],), dtype='float32', order='F')
+		if self.n is None: self.n = np.zeros(                                    Y.shape[1]  , dtype='float32'           )
+
 		for c in xrange(Y.shape[1]):
-			
+
+			if not np.any(Y[:,c]==1): continue
+
 			XT = self.XE[Y[:,c]==1].reshape(-1, np.prod(self.XE.shape[-3:]))
-			self.C[c] += np.dot(XT.T, XT)
+			ssyrk(alpha=1.0, a=XT, trans=1, beta=1.0, c=self.C[:,:,c], overwrite_c=1)
 			self.n[c] += np.sum(Y[:,c]==1)
 			
 	def solve(self):
-		
+
+		self.C = np.ascontiguousarray(np.rollaxis(self.C, -1))
+		for c in xrange(self.C.shape[0]): self.C[c] += self.C[c].T; self.C[c][np.diag_indices_from(self.C[c])] /= 2
+
 		c = self.C.shape[0]
 		n = self.W.shape[0]
 

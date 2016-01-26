@@ -29,12 +29,14 @@ parser.add_argument('-limit', type=int, default=0            )
 
 ## Network Examples
 
-mnist_1l = ['norm:1,0/1,0', 'conv:100,0,7,7/1,1/1', 'mpol:7,7/4,4', 'relu']
-mnist_2l = ['norm:1,0/1,0', 'conv:40,0,7,7/1,1/1' , 'mpol:3,3/2,2', 'relu', 'norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu']
+def nin(n): return ['norm:1,0/1,0',                 'conv:%s,0,1,1/1,1/0' % n, 'relu']
+def cv3(n): return ['norm:1,0/1,0', 'padd:1,1,1,1', 'conv:%s,0,3,3/1,1/0' % n, 'relu']
+def cv5(n): return ['norm:1,0/1,0', 'padd:2,2,2,2', 'conv:%s,0,5,5/1,1/0' % n, 'relu']
+def cv7(n): return ['norm:1,0/1,0', 'padd:3,3,3,3', 'conv:%s,0,7,7/1,1/0' % n, 'relu']
 
-#nin       = ['norm:1,0/0,0', 'conv:60,80,1,1/1,1/0', 'relu']
-conv3      = ['norm:1,0/1,0', 'padd:1,1,1,1', 'conv:40,0,3,3/1,1/0', 'relu']
-mnist_deep = ['norm:1,0/0,0', 'conv:40,0,7,7/1,1/1', 'mpol:3,3/2,2', 'relu'] + conv3 * 2 + ['norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu'] + ['norm:0,0/1,0']
+mnist_1l = cv7(40) + ['norm:1,0/1,0', 'conv:100,0,7,7/1,1/1', 'mpol:7,7/4,4', 'relu']
+#mnist_2l = ['norm:1,0/1,0', 'conv:40,0,7,7/1,1/1' , 'mpol:3,3/2,2', 'relu', 'norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu']
+#mnist_dp = cv3(40) + cv3(20) + ['norm:1,0/0,0', 'conv:40,0,7,7/1,1/1', 'mpol:3,3/2,2', 'relu'] + cv3(40) + cv3(20) + ['norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu'] + ['norm:0,0/1,0']
 
 ## Network Hyperparameter Parsing
 
