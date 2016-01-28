@@ -29,8 +29,6 @@ def main(mainarg):
 		if len(settings.fast) < 3: XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[0]]; Xt = Xt[:settings.fast[0]]
 		else                     : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]] 
 
-	if settings.noaug: aug = None
-
 	## Load Network
 
 	net = NET(parsehp(settings.network, settings.pretrain), XT.shape[1]); net.save(settings.save)
@@ -144,7 +142,12 @@ def main(mainarg):
 		print('Training Epoch %d/%d' % (n+1, settings.epoch))
 
 		XT, YT = shuffle(XT, YT)
-		process(XT, YT, aug=aug)
+
+		if   settings.aug == 0: taug = None
+		elif settings.aug == 1: taug = aug
+		elif settings.aug == 2: taug = lambda X: aug(X, float(n+1) / settings.epoch)
+
+		process(XT, YT, aug=taug)
 
 		if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
 

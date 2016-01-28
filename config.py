@@ -6,18 +6,18 @@ LC_DEFAULT      = [EXACT_DEFAULT, ASGD_DEFAULT]
 
 import argparse; parser = argparse.ArgumentParser()
 
-parser.add_argument('-dataset', default='mnist')
+parser.add_argument('-dataset', default='mnist'                )
 parser.add_argument('-network', default=['mnist_1l'], nargs='*')
 
 parser.add_argument('-epoch'    , type=int  , default=1  )
 parser.add_argument('-batchsize', type=int  , default=50 )
 parser.add_argument('-pretrain' , type=float, default=0.1)
+parser.add_argument('-aug'      , type=int  , default=1  )
 
 parser.add_argument('-lcalg'  , type=int  , default=1                    )
 parser.add_argument('-lcparam', type=float, default=LC_DEFAULT, nargs='*')
 parser.add_argument('-mcalg'  , type=int  , default=0                    )
 
-parser.add_argument('-noaug' , action='store_true')
 parser.add_argument('-peperr', action='store_true') # report error per epoch
 parser.add_argument('-trnerr', action='store_true')
 parser.add_argument('-quiet' , action='store_true')
@@ -29,14 +29,22 @@ parser.add_argument('-limit', type=int, default=0            )
 
 ## Network Examples
 
-def nin(n): return ['norm:1,0/1,0',                 'conv:%s,0,1,1/1,1/0' % n, 'relu']
-def cv3(n): return ['norm:1,0/1,0', 'padd:1,1,1,1', 'conv:%s,0,3,3/1,1/0' % n, 'relu']
-def cv5(n): return ['norm:1,0/1,0', 'padd:2,2,2,2', 'conv:%s,0,5,5/1,1/0' % n, 'relu']
-def cv7(n): return ['norm:1,0/1,0', 'padd:3,3,3,3', 'conv:%s,0,7,7/1,1/0' % n, 'relu']
+#def nin(n): return ['norm:1,0/1,0',                 'conv:%s,0,1,1/1,1/0' % n, 'relu']
+#def cv3(n): return ['norm:1,0/1,0', 'padd:1,1,1,1', 'conv:%s,0,3,3/1,1/0' % n, 'relu']
+#def cv5(n): return ['norm:1,0/1,0', 'padd:2,2,2,2', 'conv:%s,0,5,5/1,1/0' % n, 'relu']
+#def cv7(n): return ['norm:1,0/1,0', 'padd:3,3,3,3', 'conv:%s,0,7,7/1,1/0' % n, 'relu']
 
-mnist_1l = cv7(40) + ['norm:1,0/1,0', 'conv:100,0,7,7/1,1/1', 'mpol:7,7/4,4', 'relu']
+#nist_1l = cv7(40) + ['norm:1,0/1,0', 'conv:200,0,7,7/1,1/1', 'mpol:7,7/4,4', 'relu']
 #mnist_2l = ['norm:1,0/1,0', 'conv:40,0,7,7/1,1/1' , 'mpol:3,3/2,2', 'relu', 'norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu']
 #mnist_dp = cv3(40) + cv3(20) + ['norm:1,0/0,0', 'conv:40,0,7,7/1,1/1', 'mpol:3,3/2,2', 'relu'] + cv3(40) + cv3(20) + ['norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu'] + ['norm:0,0/1,0']
+
+def mnist_block(e): return ['norm:1,0/1,0', 'conv:40,0,5,5/1,1/%s' % e, 'mpol:2,2/2,2', 'relu']
+
+mnist_deep = mnist_block(0) + mnist_block(1)
+
+def cifar10_block(e): return ['norm:1,0/1,0', 'padd:2,2,2,2', 'conv:40,0,5,5/1,1/%s' % e, 'padd:0,1,0,1', 'mpol:3,3/2,2', 'relu']
+
+cifar10_deep = cifar10_block(0) + cifar10_block(0) + cifar10_block(1)
 
 ## Network Hyperparameter Parsing
 

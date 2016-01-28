@@ -20,4 +20,4 @@ Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') / 255
 #Xt -= Xm
 
 from datasets.augmentation import *
-def aug(X): return rand_scl(rand_rot(X, 20), 0.1)
+def aug(X, r=1.0): return rand_scl(rand_rot(X, 20*r), 0.1*r)

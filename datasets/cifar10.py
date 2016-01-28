@@ -39,4 +39,4 @@ Xt = Xt.astype('float32') / 255
 # Whitening?
 
 from datasets.augmentation import *
-def aug(X): return rand_scl(rand_rot(rand_mir(X), 20), 0.1)
+def aug(X, r=1.0): return rand_trs(rand_scl(rand_rot(rand_mir(X, 0.5*r), 20*r), 0.1*r), 0.1*r)

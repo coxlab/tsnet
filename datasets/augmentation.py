@@ -29,6 +29,6 @@ def rand_scl(X, s):
 	
 	return Y
 
-def rand_mir(X):
+def rand_mir(X, p=0.5):
 
-	return X[:,:,:,::-1] if np.random.rand() >= 0.5 else X
+	return X[:,:,:,::-1] if np.random.rand() >= p else X
