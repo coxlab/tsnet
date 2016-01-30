@@ -27,7 +27,7 @@ parser.add_argument('-save' ,           default=''           ) # save Ws to file
 parser.add_argument('-fast' , type=int, default=[], nargs='*') # fast run with fewer data points
 parser.add_argument('-limit', type=int, default=0            )
 
-## Network Examples
+## Example Hyperparameter
 
 #def nin(n): return ['norm:1,0/1,0',                 'conv:%s,0,1,1/1,1/0' % n, 'relu']
 #def cv3(n): return ['norm:1,0/1,0', 'padd:1,1,1,1', 'conv:%s,0,3,3/1,1/0' % n, 'relu']
@@ -38,13 +38,13 @@ parser.add_argument('-limit', type=int, default=0            )
 #mnist_2l = ['norm:1,0/1,0', 'conv:40,0,7,7/1,1/1' , 'mpol:3,3/2,2', 'relu', 'norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu']
 #mnist_dp = cv3(40) + cv3(20) + ['norm:1,0/0,0', 'conv:40,0,7,7/1,1/1', 'mpol:3,3/2,2', 'relu'] + cv3(40) + cv3(20) + ['norm:1,0/0,0', 'conv:40,0,3,3/1,1/1', 'mpol:3,3/2,2', 'relu'] + ['norm:0,0/1,0']
 
-def mnist_block(e): return ['norm:1,0/1,0', 'conv:40,0,5,5/1,1/%s' % e, 'mpol:2,2/2,2', 'relu']
+## AlexNet Hyperparameters
 
-mnist_deep = mnist_block(0) + mnist_block(1)
+def mnist_block(e): return ['norm:1,0/1,0', 'conv:40,0,5,5/1,1/%s' % e, 'mpol:2,2/2,2', 'relu']
+mnist_deep = mnist_block(0) + mnist_block(0) + ['norm:1,0/1,0', 'conv:40,0,4,4/1,1/1', 'relu'] #+ ['norm:0,0/1,0']
 
 def cifar10_block(e): return ['norm:1,0/1,0', 'padd:2,2,2,2', 'conv:40,0,5,5/1,1/%s' % e, 'padd:0,1,0,1', 'mpol:3,3/2,2', 'relu']
-
-cifar10_deep = cifar10_block(0) + cifar10_block(0) + cifar10_block(1)
+cifar10_deep = cifar10_block(0) + cifar10_block(0) + cifar10_block(1) #+ ['norm:1,0/1,0', 'conv:40,0,4,4/1,1/1', 'relu'] #+ ['norm:0,0/1,0']
 
 ## Network Hyperparameter Parsing
 
