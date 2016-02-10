@@ -1,9 +1,8 @@
 import numpy as np
 import numexpr as ne
+from tools import *
 from skimage.util.shape import view_as_windows
 from numpy.lib.stride_tricks import as_strided
-from scipy.linalg import eigh
-from scipy.linalg.blas import ssyrk
 
 ## Basic Tools
 
@@ -44,13 +43,6 @@ def indices(shape): # memory efficient np.indices
 	for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
 	return I
 
-def reigh(Ci, Cj):
-
-	if Cj is None: s, V = eigh(Ci)
-	else         : s, V = eigh(Ci, Cj + (np.trace(Cj) / Cj.shape[0]) * np.eye(*Cj.shape, dtype='float32'))
-
-	return V[:,::-1], s[::-1]
-
 ## Layers
 
 class NORM:
@@ -66,12 +58,12 @@ class NORM:
 
 	def forward(self, X, Z):
 
-		if self.e[0][0]: self.I[0] = X
+		if self.e[0] >= 1: self.I[0] = X
 		else:
 			if self.U[0] is not None: X = X - self.U[0]
 			if self.S[0] is not None: X = X / np.maximum(self.S[0], np.single(1e-3)) # np.spacing(np.single(1))
 
-		if self.e[1][0]: self.I[1] = Z
+		if self.e[1] >= 1: self.I[1] = Z
 		else:
 			if self.U[1] is not None: Z = Z - self.U[1]
 			if self.S[1] is not None: Z = Z / np.maximum(self.S[1], np.single(1e-3))
@@ -82,7 +74,7 @@ class NORM:
 
 		for i in xrange(2):
 
-			if self.e[i][0]:
+			if self.e[i] >= 1:
 
 				self.s[i] = (1,) + self.I[i].shape[1:]
 				n         = self.I[i].shape[0]
@@ -91,7 +83,7 @@ class NORM:
 				self.U[i] = np.zeros(self.I[i].shape[1], dtype='float32') if self.U[i] is None else self.U[i]
 				U         = self.U[i] + (np.sum(self.I[i], 0) - n * self.U[i]) / (self.n[i] + n)
 
-				if self.e[i][1]:
+				if self.e[i] >= 2:
 
 					self.S[i]  = np.zeros(self.I[i].shape[1], dtype='float32') if self.S[i] is None else self.S[i]
 					self.S[i] += np.sum(np.square(self.I[i]), 0) - (self.n[i] + n) * np.square(U) + self.n[i] * np.square(self.U[i])
@@ -103,14 +95,14 @@ class NORM:
 
 		for i in xrange(2):
 			
-			if self.e[i][0]: self.U[i] = self.U[i].reshape(self.s[i])
-			if self.e[i][1]: self.S[i] = self.S[i].reshape(self.s[i]); self.S[i] = np.sqrt(self.S[i] / self.n[i])
+			if self.e[i] >= 1: self.U[i] = self.U[i].reshape(self.s[i])
+			if self.e[i] >= 2: self.S[i] = self.S[i].reshape(self.s[i]); self.S[i] = np.sqrt(self.S[i] / self.n[i])
 
-		self.e = [[0, 0], [0, 0]]
+		self.e = [0, 0]
 
 class CONV:
 
-	def __init__(self, w, s, e, l):
+	def __init__(self, w, s=[1,1], e=1, l=0):
 
 		self.W = np.random.randn(*w).astype('float32')
 		self.s = s
@@ -145,13 +137,13 @@ class CONV:
 			if not np.any(Y[:,c]==1): continue
 
 			XT = self.XE[Y[:,c]==1].reshape(-1, np.prod(self.XE.shape[-3:]))
-			ssyrk(alpha=1.0, a=XT, trans=1, beta=1.0, c=self.C[:,:,c], overwrite_c=1)
+			syrk(XT, self.C[:,:,c])
 			self.n[c] += np.sum(Y[:,c]==1)
 			
 	def solve(self):
 
 		self.C = np.ascontiguousarray(np.rollaxis(self.C, -1))
-		for c in xrange(self.C.shape[0]): self.C[c] += self.C[c].T; self.C[c][np.diag_indices_from(self.C[c])] /= 2
+		for c in xrange(self.C.shape[0]): symm(self.C[c])
 
 		c = self.C.shape[0]
 		n = self.W.shape[0]
@@ -210,7 +202,13 @@ class MPOL:
 
 class RELU:
 
+	#def __init__(self): self.g = 1
+
 	def forward(self, X, Z):
+
+		#if self.g > 1:
+		#	X = X.reshape((X.shape[0], self.g, X.shape[1]/self.g, X.shape[2], X.shape[3]))
+		#	X = np.amax(X, 1) * (np.amin(X, 1) > 0)
 
 		Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
 

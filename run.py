@@ -15,8 +15,8 @@ def main(mainarg):
 
 	settings = parser.parse_args(mainarg); np.random.seed(settings.seed)
 
-	settings.peperr  &= (settings.lcalg == 1)
-	settings.pretrain = 0 if settings.mcalg != 0 else settings.pretrain
+	settings.peperr      = (settings.lcalg == 1)
+	settings.pretrain[0] = 0 if settings.mcalg != 0 else settings.pretrain[0]
 
 	## Load Dataset
 
@@ -31,7 +31,7 @@ def main(mainarg):
 
 	## Load Network
 
-	net = NET(parsehp(settings.network, settings.pretrain), XT.shape[1]); net.save(settings.save)
+	net = NET(spec2hp(settings.network), XT.shape[1], settings.pretrain[0]); net.save(settings.save)
 
 	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM']
 	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV']
@@ -74,13 +74,12 @@ def main(mainarg):
 
 				if mode == 'pretrain':
 
-					net.forward (Xb,          net.pL               )
+					net.forward (Xb,          net.pL           )
 					net.pretrain(enc(Yb), net.pL, mode='update')
 
 				elif mode == 'train':
 
-					Zb = net.forward(Xb)
-					#Zs = Zb.shape[1:]
+					Zb = net.forward(Xb); net.Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
 					classifier.update(Zb, enc(Yb))
@@ -88,8 +87,7 @@ def main(mainarg):
 
 				elif mode == 'test':
 
-					Zb = net.forward(Xb)
-					#Zs = Zb.shape[1:]
+					Zb = net.forward(Xb); net.Zs = Zb.shape[1:]
 					Zb = Zb.reshape(Zb.shape[0], -1)
 
 					err += np.count_nonzero(dec(classifier.infer(Zb)) != Yb)
@@ -100,7 +98,7 @@ def main(mainarg):
 					msg  = 'Batch %d/%d '   % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
 					msg += '['
 					#msg += 'Dim(%s) = %s; ' % ('Aug(X)' if aug is not None else 'X', str(Xb.shape[1:]))
-					#msg += 'Dim(Z) = %s; '  % str(Zs)
+					#msg += 'Dim(Z) = %s; '  % str(net.Zs)
 					msg += 'ER = %e; '      % (float(err) / smp) if (mode == 'train') and settings.peperr else ''
 					msg += 't = %.2f Sec '  % t
 					msg += '(%.2f Img/Sec)' % (Xb.shape[0] / t)
@@ -110,8 +108,7 @@ def main(mainarg):
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
 
 		if   mode == 'pretrain': net.pretrain(None, net.pL, mode='solve')
-		elif mode == 'train'   : pass
-		elif mode == 'test'    : return err
+		else                   : return err
 
 	## Start
 
@@ -123,19 +120,26 @@ def main(mainarg):
 
 	## Pretraining
 
-	if settings.pretrain:
+	if any(settings.pretrain):
 
 		for l in sorted(NL + CL):
 
+			if   l in CL and not settings.pretrain[0]: continue
+			elif l in NL and not settings.pretrain[1]: continue
+
 			print('Pretraining Network Layer %d' % (l+1)); net.pL = l+1
 
-			XT, YT = shuffle(XT, YT); pN = XT.shape[0] * settings.pretrain
+			XT, YT = shuffle(XT, YT)
+			pN     = XT.shape[0] * settings.pretrain[0 if l in CL else 1]
+
 			process(XT[:pN], YT[:pN], mode='pretrain')
 
-		net.save(settings.save)
+		if settings.pretrain[0]: net.save(settings.save)
 		print('-' * 55 + ' ' + time.ctime())
 
 	## Training
+
+	settings.lrnrate = expr2param(settings.lrnrate)
 
 	for n in xrange(settings.epoch):
 
@@ -147,15 +151,30 @@ def main(mainarg):
 		elif settings.aug == 1: taug = aug
 		elif settings.aug == 2: taug = lambda X: aug(X, float(n+1) / settings.epoch)
 
-		process(XT, YT, aug=taug)
+		err = process(XT, YT, aug=taug)
 
-		if settings.peperr and classifier.WZ is not None and n < (settings.epoch - 1):
+		if settings.peperr:
 
-			if Xv.shape[0] > 0: val = process(Xv, Yv, mode='test'); print('VAL Error = %d' % val)
-			if Xt.shape[0] > 0: tst = process(Xt, Yt, mode='test'); print('TST Error = %d' % tst)
+			print('TRN Error ~ %d' % err)
 
-			if val < bval: bval = val
-			if tst < btst: btst = tst
+			if classifier.WZ is not None and n < (settings.epoch - 1):
+
+				if settings.trnerr:                                     print('TRN Error = %d' % process(XT, YT, mode='test'))
+				if Xv.shape[0] > 0: val = process(Xv, Yv, mode='test'); print('VAL Error = %d' % val)
+				if Xt.shape[0] > 0: tst = process(Xt, Yt, mode='test'); print('TST Error = %d' % tst)
+
+				if val < bval: bval = val
+				if tst < btst: btst = tst
+
+		if len(settings.lrnrate) > 0:
+
+			classifier.solve(settings.lcparam[-1])
+
+			net.train(classifier.WZ, CL[0], settings.lrnrate[0])
+			net.save (settings.save)
+
+			settings.lrnrate = settings.lrnrate[1:]
+			classifier       = Linear(*lcarg)
 
 		print('-' * 55 + ' ' + time.ctime())
 
