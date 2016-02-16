@@ -2,6 +2,7 @@
 
 import numpy as np
 import numexpr as ne
+from tools import savemats
 
 one = np.ones(1, dtype='float32')
 
@@ -24,17 +25,18 @@ class Linear():
 
 		if self.WZ is None:
 
-			self.tWZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
-			self. WZ = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
-			self.cch = np.zeros((Z.shape[1],Y.shape[1]), dtype='float32')
-			self.tif = np.zeros((Z.shape[0],Y.shape[1]), dtype='float32')
+			self.tWZ = np.zeros(Z.shape[1:] + (Y.shape[1],), dtype='float32')
+			self. WZ = np.zeros(Z.shape[1:] + (Y.shape[1],), dtype='float32')
 
-		D = np.dot(Z, self.tWZ, out=self.tif) * Y
+			self.cch = np.zeros((np.prod(Z.shape[1:]), Y.shape[1]), dtype='float32')
+			self.res = np.zeros((        Z.shape[0 ] , Y.shape[1]), dtype='float32')
+
+		D = self.infer(Z, False) * Y
 		D = (D < 1) * Y
 
 		nescale(self.tWZ, one - self.tss * self.l2r)
 		nescale(self. WZ, one - self. ss)
-		newtsum(self.tWZ, self.tss, np.dot(Z.T, D, out=self.cch))
+		newtsum(self.tWZ, self.tss, np.dot(Z.reshape(Z.shape[0],-1).T, D, out=self.cch).reshape(self.tWZ.shape))
 		newtsum(self. WZ, self. ss, self.tWZ)
 
 		self.t   += 1
@@ -45,6 +47,13 @@ class Linear():
 
 		pass
 
-	def infer(self, Z):
+	def infer(self, Z=None, a=True):
 
-		return np.dot(Z, self.WZ)
+		if Z is None: return self.res
+
+		if a: return np.dot(Z.reshape(Z.shape[0], -1), self. WZ.reshape(-1, self. WZ.shape[-1]), out=self.res)
+		else: return np.dot(Z.reshape(Z.shape[0], -1), self.tWZ.reshape(-1, self.tWZ.shape[-1]), out=self.res)
+
+	def save(self, fn):
+
+		savemats(fn, [self.WZ])

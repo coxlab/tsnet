@@ -31,7 +31,9 @@ parser.add_argument('-limit', type=int, default=0            )
 
 ## Example Hyperparameter
 
-mnist_1l = ['norm:1/1', 'conv:100,0,7,7', 'mpol:7,7/4,4'] #+ ['relu']
+mnist_1l   = ['norm:1/1', 'conv:100,0,7,7', 'mpol:7,7/4,4'] #+ ['relu']
+cifar10_1l = ['norm:1/1', 'conv:100,0,9,9', 'mpol:9,9/5,5'] #+ ['relu']
+mnist_2l   = ['norm:1/1', 'conv:10,0,7,7', 'mpol:3,3/2,2', 'conv:10,0,3,3', 'mpol:3,3/2,2']
 
 ## Network Hyperparameter Parsing
 

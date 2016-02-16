@@ -79,17 +79,12 @@ def main(mainarg):
 
 				elif mode == 'train':
 
-					Zb = net.forward(Xb); net.Zs = Zb.shape[1:]
-					Zb = Zb.reshape(Zb.shape[0], -1)
-
-					classifier.update(Zb, enc(Yb))
-					err += np.count_nonzero(dec(classifier.tif) != Yb) if settings.peperr else 0
+					Zb = net.forward(Xb); classifier.update(Zb, enc(Yb))
+					err += np.count_nonzero(dec(classifier.infer(  )) != Yb) if settings.peperr else 0
 
 				elif mode == 'test':
 
-					Zb = net.forward(Xb); net.Zs = Zb.shape[1:]
-					Zb = Zb.reshape(Zb.shape[0], -1)
-
+					Zb = net.forward(Xb)
 					err += np.count_nonzero(dec(classifier.infer(Zb)) != Yb)
 
 				if not settings.quiet:
@@ -185,6 +180,7 @@ def main(mainarg):
 		print('Testing Classifier (p = %.2f)' % settings.lcparam[p])
 
 		classifier.solve(settings.lcparam[p])
+		#classifier.save (settings.save      )
 
 		print(                                                         '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
 		if settings.trnerr:                                      print('TRN Error = %d' % process(XT, YT, mode='test'))
