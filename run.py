@@ -33,8 +33,9 @@ def main(mainarg):
 
 	net = NET(spec2hp(settings.network), XT.shape[1], settings.pretrain[0]); net.save(settings.save)
 
-	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM']
-	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV']
+	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM'                   ]
+	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV'                   ]
+	EL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV' and net.layer[l].e]
 
 	## Load Classifier
 
@@ -152,7 +153,7 @@ def main(mainarg):
 
 			print('TRN Error ~ %d' % err)
 
-			if classifier.WZ is not None and n < (settings.epoch - 1):
+			if classifier.get() is not None and n < (settings.epoch - 1):
 
 				if settings.trnerr:                                     print('TRN Error = %d' % process(XT, YT, mode='test'))
 				if Xv.shape[0] > 0: val = process(Xv, Yv, mode='test'); print('VAL Error = %d' % val)
@@ -165,7 +166,7 @@ def main(mainarg):
 
 			classifier.solve(settings.lcparam[-1])
 
-			net.train(classifier.WZ, CL[0], settings.lrnrate[0])
+			net.train(classifier.get(), EL, settings.lrnrate[0])
 			net.save (settings.save)
 
 			settings.lrnrate = settings.lrnrate[1:]
@@ -182,7 +183,7 @@ def main(mainarg):
 		classifier.solve(settings.lcparam[p])
 		#classifier.save (settings.save      )
 
-		print(                                                         '||WZ||    = %e' % np.linalg.norm(classifier.WZ))
+		print(                                                         '||WZ||    = %e' % np.linalg.norm(classifier.get()))
 		if settings.trnerr:                                      print('TRN Error = %d' % process(XT, YT, mode='test'))
 		if Xv.shape[0] > 0: fval = process(Xv, Yv, mode='test'); print('VAL Error = %d' % fval)
 		if Xt.shape[0] > 0: ftst = process(Xt, Yt, mode='test'); print('TST Error = %d' % ftst)

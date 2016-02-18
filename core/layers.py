@@ -1,41 +1,8 @@
 import numpy as np
 import numexpr as ne
-from tools import *
-from skimage.util.shape import view_as_windows
-from numpy.lib.stride_tricks import as_strided
 
-## Basic Tools
-
-def view(T, w):
-
-	T = view_as_windows(T, w+(1,)*(T.ndim-len(w))).squeeze(tuple(range(T.ndim+4, T.ndim*2)))
-	T = T.transpose(range(4) + range(T.ndim-4, T.ndim) + range(4, T.ndim-4))
-
-	return T
-
-def dot(T, W):
-
-	T = np.tensordot(T, W, ([3,4,5],[1,2,3]))
-	T = np.rollaxis(T, T.ndim-1, 1)
-
-	return T
-
-def striding(T, s):
-
-	o  = []
-	o += [((T.shape[2]-1) % s[0]) / 2]
-	o += [((T.shape[3]-1) % s[1]) / 2]
-
-	return T[:,:,o[0]::s[0],o[1]::s[1]]
-
-def expansion(Z, n):
-
-	if Z.shape[1] == n: return Z
-
-	Zsh = list(Z.shape  ); Zsh[1] = n
-	Zst = list(Z.strides); Zst[1] = 0
-
-	return as_strided(Z, Zsh, Zst)
+from core.operations import view, dot, striding, expansion
+from tools import symm, syrk, reigh
 
 def indices(shape): # memory efficient np.indices
 

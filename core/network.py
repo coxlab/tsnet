@@ -1,6 +1,8 @@
 import numpy as np
-from core.layers import *
-from tools import *
+
+from core.layers import NORM, CONV, MPOL, RELU, PADD
+from core.operations import collapse
+from tools import symm, syrk, reigh, savemats
 
 class NET():
 
@@ -34,31 +36,36 @@ class NET():
 
 	def train(self, WZ, L, rate):
 
-		WZ = np.reshape (WZ, self.Zs + (-1,))
-		WZ = np.rollaxis(WZ, -1)
-		WZ = np.rollaxis(WZ, -6)
-		WZ = np.reshape (WZ, (WZ.shape[0], -1, np.prod(WZ.shape[-3:])))
+		WZ = [WZ]
+		for i in xrange(len(L)-1): WZ += [collapse(WZ[-1], self.layer[L[i]].W)]
 
-		C = np.zeros((WZ.shape[-1],)*2 + (WZ.shape[0],), dtype='float32', order='F')
-		for c in xrange(C.shape[-1]): syrk(WZ[c,:,:], C[:,:,c]); symm(C[:,:,c])
-		C = np.ascontiguousarray(np.rollaxis(C, -1))
+		for l in L:
 
-		#tW = []
+			WZ[0] = np.rollaxis(WZ[0], -6)
+			WZ[0] = np.reshape (WZ[0], (WZ[0].shape[0], -1, np.prod(WZ[0].shape[-3:])))
 
-		for c in xrange(C.shape[0]):
+			C = np.zeros((WZ[0].shape[-1],)*2 + (WZ[0].shape[0],), dtype='float32', order='F')
+			for c in xrange(C.shape[-1]): syrk(WZ[0][c,:,:], C[:,:,c]); symm(C[:,:,c])
+			C = np.ascontiguousarray(np.rollaxis(C, -1))
 
-			W, _ = reigh(C[c], np.mean(C[np.arange(C.shape[0]) != c], 0))
-			W    = W[:,0].reshape(self.layer[L].W[c].shape)
-			W   /= np.linalg.norm(W.ravel())
-			W   *= np.linalg.norm(self.layer[L].W[c].ravel())
-			W   *= np.sign(np.inner(W.ravel(), self.layer[L].W[c].ravel()))
+			#tW = []
 
-			self.layer[L].W[c] *= np.single(1.0 - rate)
-			self.layer[L].W[c] += np.single(rate) * W
-			#tW += [W[None]]
+			for c in xrange(C.shape[0]):
 
-		#self.layer[L  ].W  = np.vstack([self.layer[L].W] + tW)
-		#self.layer[L+1].g += 1
+				W, _ = reigh(C[c], np.mean(C[np.arange(C.shape[0]) != c], 0))
+				W    = W[:,0].reshape(self.layer[l].W[c].shape)
+				W   /= np.linalg.norm(W.ravel())
+				W   *= np.linalg.norm(self.layer[l].W[c].ravel())
+				W   *= np.sign(np.inner(W.ravel(), self.layer[l].W[c].ravel()))
+
+				self.layer[l].W[c] *= np.single(1.0 - rate)
+				self.layer[l].W[c] += np.single(rate) * W
+				#tW += [W[None]]
+
+			#self.layer[l  ].W  = np.vstack([self.layer[l].W] + tW)
+			#self.layer[l+1].g += 1
+
+			WZ = WZ[1:]
 
 	def save(self, fn):
 

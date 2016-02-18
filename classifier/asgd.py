@@ -54,6 +54,11 @@ class Linear():
 		if a: return np.dot(Z.reshape(Z.shape[0], -1), self. WZ.reshape(-1, self. WZ.shape[-1]), out=self.res)
 		else: return np.dot(Z.reshape(Z.shape[0], -1), self.tWZ.reshape(-1, self.tWZ.shape[-1]), out=self.res)
 
+	def get(self):
+
+		if self.WZ is None: return None
+		else              : return np.rollaxis(self.WZ, -1)
+
 	def save(self, fn):
 
 		savemats(fn, [self.WZ])
