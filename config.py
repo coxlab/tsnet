@@ -13,7 +13,7 @@ parser.add_argument('-epoch'    , type=int  , default=1 )
 parser.add_argument('-batchsize', type=int  , default=50)
 parser.add_argument('-aug'      , type=int  , default=1 )
 
-parser.add_argument('-pretrain', type=float, default=[0.1, 0.1], nargs=2  )
+parser.add_argument('-pretrain', type=float, default=[0.0, 0.1], nargs=2  )
 parser.add_argument('-lrnrate' ,             default=[]        , nargs='*')
 #parser.add_argument('-lrnfreq' , type=int  , default=1                    )
 
@@ -33,9 +33,7 @@ parser.add_argument('-limit', type=int, default=0            )
 
 mnist_1l   = ['norm:1/1'] + ['conv:100,0,7,7', 'mpol:7,7/4,4'] #+ ['relu']
 cifar10_1l = ['norm:1/1'] + ['conv:100,0,9,9', 'mpol:9,9/5,5'] #+ ['relu']
-#mnist_2l   = ['norm:1/1'] + ['conv:10,0,7,7', 'mpol:3,3/2,2'] + ['conv:10,0,3,3', 'mpol:3,3/2,2']
-mnist_2l   = ['norm:1/1'] + ['conv:10,0,5,5', 'mpol:3,3/2,2'] + ['conv:10,0,5,5', 'mpol:3,3/2,2']
-#mnist_2l   = ['norm:1/1'] + ['conv:20,0,5,5', 'mpol:3,3/2,2'] + ['relu'] + ['conv:20,0,5,5', 'mpol:3,3/2,2'] + ['relu']
+mnist_2l   = ['norm:1/1'] + ['conv:20,0,5,5', 'mpol:2,2/2,2'] + ['conv:50,0,5,5', 'mpol:2,2/2,2'] #+ ['conv:10,0,4,4', 'relu']
 
 ## Network Hyperparameter Parsing
 

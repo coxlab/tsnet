@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.distance import cosine
 
 from core.layers import NORM, CONV, MPOL, RELU, PADD
 from core.operations import collapse
@@ -49,6 +50,7 @@ class NET():
 			C = np.ascontiguousarray(np.rollaxis(C, -1))
 
 			#tW = []
+			d = np.zeros(C.shape[0])
 
 			for c in xrange(C.shape[0]):
 
@@ -58,6 +60,8 @@ class NET():
 				W   *= np.linalg.norm(self.layer[l].W[c].ravel())
 				W   *= np.sign(np.inner(W.ravel(), self.layer[l].W[c].ravel()))
 
+				d[c] = cosine(self.layer[l].W[c].ravel(), W.ravel())
+
 				self.layer[l].W[c] *= np.single(1.0 - rate)
 				self.layer[l].W[c] += np.single(rate) * W
 				#tW += [W[None]]
@@ -66,6 +70,7 @@ class NET():
 			#self.layer[l+1].g += 1
 
 			WZ = WZ[1:]
+			print('cos(W,W\') = %f+-%f' % (np.mean(d), np.std(d)))
 
 	def save(self, fn):
 
