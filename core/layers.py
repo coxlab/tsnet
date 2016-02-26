@@ -1,8 +1,7 @@
 import numpy as np
 import numexpr as ne
 
-from core.operations import view, dot, striding, expansion
-from tools import symm, syrk, reigh
+from core.operations import expansion, collapse
 
 def indices(shape): # memory efficient np.indices
 
@@ -12,153 +11,49 @@ def indices(shape): # memory efficient np.indices
 
 ## Layers
 
-class NORM:
-
-	def __init__(self, eX, eZ):
-
-		self.e = [eX, eZ]
-		self.U = [None, None]
-		self.S = [None, None]
-		self.n = [ 0,  0]
-		self.I = [[], []]
-		self.s = [[], []]
-
-	def forward(self, X, Z):
-
-		if self.e[0] >= 1: self.I[0] = X
-		else:
-			if self.U[0] is not None: X = X - self.U[0]
-			if self.S[0] is not None: X = X / np.maximum(self.S[0], np.single(1e-3)) # np.spacing(np.single(1))
-
-		if self.e[1] >= 1: self.I[1] = Z
-		else:
-			if self.U[1] is not None: Z = Z - self.U[1]
-			if self.S[1] is not None: Z = Z / np.maximum(self.S[1], np.single(1e-3))
-
-		return X, Z
-
-	def update(self, _):
-
-		for i in xrange(2):
-
-			if self.e[i] >= 1:
-
-				self.s[i] = (1,) + self.I[i].shape[1:]
-				n         = self.I[i].shape[0]
-				self.I[i] = self.I[i].reshape(n, -1)
-
-				self.U[i] = np.zeros(self.I[i].shape[1], dtype='float32') if self.U[i] is None else self.U[i]
-				U         = self.U[i] + (np.sum(self.I[i], 0) - n * self.U[i]) / (self.n[i] + n)
-
-				if self.e[i] >= 2:
-
-					self.S[i]  = np.zeros(self.I[i].shape[1], dtype='float32') if self.S[i] is None else self.S[i]
-					self.S[i] += np.sum(np.square(self.I[i]), 0) - (self.n[i] + n) * np.square(U) + self.n[i] * np.square(self.U[i])
-
-				self.U[i]  = U
-				self.n[i] += n
-
-	def solve(self):
-
-		for i in xrange(2):
-			
-			if self.e[i] >= 1: self.U[i] = self.U[i].reshape(self.s[i])
-			if self.e[i] >= 2: self.S[i] = self.S[i].reshape(self.s[i]); self.S[i] = np.sqrt(self.S[i] / self.n[i])
-
-		self.e = [0, 0]
-
 class CONV:
 
-	def __init__(self, w, s=[1,1], e=1, l=0):
+	def __init__(self, w, s=[1,1], sh=None):
 
-		self.W = np.random.randn(*w).astype('float32')
-		self.s = s
-		self.e = e
-
-		self.l = l
-		self.C = None
-		self.n = None
+		self.w    = w
+		self.w[1] = w[1] if sh is None else sh[1]
+		self.s    = s
+		self.W    = None if sh is None else np.random.randn(*w).astype('float32')
+		self.o    = None if sh is None else [((sh[2]-1) % s[0]) / 2, ((sh[3]-1) % s[1]) / 2]
 
 	def forward(self, X, Z):
 
-		X = view(X, (1,)+self.W.shape[1:]).squeeze(4)
-		Z = view(Z, (1,)+self.W.shape[1:]).squeeze(4)
+		if self.W is None: self.__init__(self.w, self.s, sh=X.shape)
 
-		X = striding(X, self.s)
-		Z = striding(Z, self.s)
+		X = expansion(X, self.W.shape[1:])
+		Z = expansion(Z, self.W.shape[1:])
 
-		if self.l: self.XE = X
+		X = X[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
+		Z = Z[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
 
-		X = dot(X.squeeze(1), self.W)
-		Z = dot(Z.squeeze(1), self.W) if not self.e else Z # np.repeat(Z, X.shape[1], 1) if not DELAYED_EXPANSION
+		X = collapse(X, self.W)
 
 		return X, Z
-
-	def update(self, Y):
-
-		if self.C is None: self.C = np.zeros((np.prod(self.XE.shape[-3:]),)*2 + (Y.shape[1],), dtype='float32', order='F')
-		if self.n is None: self.n = np.zeros(                                    Y.shape[1]  , dtype='float32'           )
-
-		for c in xrange(Y.shape[1]):
-
-			if not np.any(Y[:,c]==1): continue
-
-			XT = self.XE[Y[:,c]==1].reshape(-1, np.prod(self.XE.shape[-3:]))
-			syrk(XT, self.C[:,:,c])
-			self.n[c] += np.sum(Y[:,c]==1)
-			
-	def solve(self):
-
-		self.C = np.ascontiguousarray(np.rollaxis(self.C, -1))
-		for c in xrange(self.C.shape[0]): symm(self.C[c])
-
-		c = self.C.shape[0]
-		n = self.W.shape[0]
-
-		G = np.eye(c)*2 - 1
-		V, s = [], []
-
-		for g in xrange(G.shape[0]):
-
-			ni = self.n[G[g]== 1].sum()
-			nj = self.n[G[g]==-1].sum()
-
-			Ci = (self.C[G[g]== 1].sum(0) / ni) if ni != 0 else None
-			Cj = (self.C[G[g]==-1].sum(0) / nj) if nj != 0 else None
-
-			Vi, si = reigh(Ci, Cj) #if Ci is not None else ([0],)*2
-			#Vj, sj = reigh(Cj, Ci) if Cj is not None else ([0],)*2
-
-			ng = len(range(n)[g::G.shape[0]]) / 2
-
-			V += [Vi[:,:ng].T] #if si[0] >= sj[0] else [Vj[:,:ng].T]
-			s += [si[  :ng]  ] #if si[0] >= sj[0] else [sj[  :ng]  ]
-
-			V += [-V[-1]]
-			print('EV Group %d: %s' % (g, str(s[-1])))
-
-		V = np.vstack(V)
-		V = V.reshape((-1,) + self.W.shape[-3:])
-
-		self.W[:V.shape[0]] = V
-		self.l              = 0
 
 class MPOL:
 
-	def __init__(self, w, s): 
+	def __init__(self, w, s=[1,1], sh=None): 
 
 		self.w = w
 		self.s = s
+		self.o = None if sh is None else [((sh[2]-1) % s[0]) / 2, ((sh[3]-1) % s[1]) / 2]
 
 	def forward(self, X, Z):
 
-		X = view(X, (1,1)+tuple(self.w)).squeeze((4,5))
-		Z = view(Z, (1,1)+tuple(self.w)).squeeze((4,5))
+		if self.o is None: self.__init__(self.w, self.s, sh=X.shape)
 
-		X = striding(X, self.s)
-		Z = striding(Z, self.s)
+		X = expansion(X, (1,)+tuple(self.w)).squeeze(4)
+		Z = expansion(Z, (1,)+tuple(self.w)).squeeze(4)
 
-		Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
+		X = X[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
+		Z = Z[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
+
+		Z = expansion(Z, (X.shape[1],)) # 2nd-STAGE EXPANSION
 
 		I = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(self.w))
 
@@ -169,15 +64,9 @@ class MPOL:
 
 class RELU:
 
-	#def __init__(self): self.g = 1
-
 	def forward(self, X, Z):
 
-		#if self.g > 1:
-		#	X = X.reshape((X.shape[0], self.g, X.shape[1]/self.g, X.shape[2], X.shape[3]))
-		#	X = np.amax(X, 1) * (np.amin(X, 1) > 0)
-
-		Z = expansion(Z, X.shape[1]) # DELAYED_EXPANSION
+		Z = expansion(Z, (X.shape[1],)) # 2nd-STAGE EXPANSION
 
 		I = X <= 0
 		X = ne.evaluate('where(I, 0, X)', order='C')

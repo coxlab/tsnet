@@ -1,76 +1,79 @@
 import numpy as np
 from scipy.spatial.distance import cosine
 
-from core.layers import NORM, CONV, MPOL, RELU, PADD
-from core.operations import collapse
+from core.layers import CONV, MPOL, RELU, PADD
+from core.operations import collapse, reconstruction
 from tools import symm, syrk, reigh, savemats
+
+def decomp(W, Wref):
+
+	C = np.zeros((np.prod(W.shape[-3:]),)*2 + (W.shape[1],), dtype='float32', order='F')
+
+	for c in xrange(C.shape[-1]):
+
+		syrk(W[:,c].reshape(-1, C.shape[0]), C[:,:,c])
+		symm(C[:,:,c])
+
+	C  = np.ascontiguousarray(np.rollaxis(C, -1))
+	Wo = []
+
+	for c in xrange(C.shape[0]):
+
+		V, _ = reigh(C[c], np.mean(C[np.arange(C.shape[0]) != c], 0))
+		V  = V[:,0].reshape(Wref[c].shape)
+		V *= np.sign(np.inner(V.ravel(), Wref[c].ravel()))
+
+		Wo += [V[None]]
+
+	return np.vstack(Wo)
 
 class NET():
 
-	def __init__(self, hp, ch, fptrn):
+	def __init__(self, hp):
 
 		self.layer = []
 
 		for l in xrange(len(hp)):
 
-			if   hp[l][0] == 'NORM':                                    self.layer += [NORM(*hp[l][1:]         )]
-			elif hp[l][0] == 'CONV': hp[l][1][1], ch = ch, hp[l][1][0]; self.layer += [CONV(*hp[l][1:], l=fptrn)]
-			elif hp[l][0] == 'MPOL':                                    self.layer += [MPOL(*hp[l][1:]         )]
-			elif hp[l][0] == 'RELU':                                    self.layer += [RELU(                   )]
-			elif hp[l][0] == 'PADD':                                    self.layer += [PADD(*hp[l][1:]         )]
+			if   hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]
+			elif hp[l][0] == 'MPOL': self.layer += [MPOL(*hp[l][1:])]
+			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
+			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
 
 			else: raise TypeError('Undefined Type in Layer {0}!'.format(str(l+1)))
 
 	def forward(self, X, L=None):
 
 		L = len(self.layer) if L is None else L
-		Z = np.copy(X)
+		Z = X #np.copy(X)
 
 		for l in xrange(L): X, Z = self.layer[l].forward(X, Z)
 
 		return Z
 
-	def pretrain(self, Y, L, mode):
+	def train(self, Z, L, rate):
 
-		if mode == 'update': self.layer[L-1].update(Y)
-		else               : self.layer[L-1].solve()
+		Z = [Z]
+		for l in L: Z += [collapse(Z[-1], self.layer[l].W)]
 
-	def train(self, WZ, L, rate):
+		dZ, Z = Z[-1], Z[:-1]
 
-		WZ = [WZ]
-		for i in xrange(len(L)-1): WZ += [collapse(WZ[-1], self.layer[L[i]].W)]
+		for l in L[::-1]:
 
-		for l in L:
+			dW  = np.reshape    (dZ, dZ.shape + (1,)*3) * Z[-1]
+			dW  = np.reshape    (dW, (-1,) + dW.shape[-6:])
+			#dW  = np.mean       (dW, (0,2,3))
+			dW = decomp(dW, np.mean(dW, (0,2,3)))
+			dW /= np.linalg.norm(dW)
 
-			WZ[0] = np.rollaxis(WZ[0], -6)
-			WZ[0] = np.reshape (WZ[0], (WZ[0].shape[0], -1, np.prod(WZ[0].shape[-3:])))
+			E   = np.linalg.norm(self.layer[l].W)
+			#dW *= E / np.linalg.norm(np.mean(dW, (0,2,3)))
+			#self.layer[l].W = decomp(self.layer[l].W[None,:,None,None]+dW, self.layer[l].W)
 
-			C = np.zeros((WZ[0].shape[-1],)*2 + (WZ[0].shape[0],), dtype='float32', order='F')
-			for c in xrange(C.shape[-1]): syrk(WZ[0][c,:,:], C[:,:,c]); symm(C[:,:,c])
-			C = np.ascontiguousarray(np.rollaxis(C, -1))
+			self.layer[l].W += E * dW
+			self.layer[l].W *= E / np.linalg.norm(self.layer[l].W)
 
-			#tW = []
-			d = np.zeros(C.shape[0])
-
-			for c in xrange(C.shape[0]):
-
-				W, _ = reigh(C[c], np.mean(C[np.arange(C.shape[0]) != c], 0))
-				W    = W[:,0].reshape(self.layer[l].W[c].shape)
-				W   /= np.linalg.norm(W.ravel())
-				W   *= np.linalg.norm(self.layer[l].W[c].ravel())
-				W   *= np.sign(np.inner(W.ravel(), self.layer[l].W[c].ravel()))
-
-				d[c] = cosine(self.layer[l].W[c].ravel(), W.ravel())
-
-				self.layer[l].W[c] *= np.single(1.0 - rate)
-				self.layer[l].W[c] += np.single(rate) * W
-				#tW += [W[None]]
-
-			#self.layer[l  ].W  = np.vstack([self.layer[l].W] + tW)
-			#self.layer[l+1].g += 1
-
-			WZ = WZ[1:]
-			print('cos(W,W\') = %f+-%f' % (np.mean(d), np.std(d)))
+			dZ, Z = reconstruction(dZ, self.layer[l].W), Z[:-1]
 
 	def save(self, fn):
 

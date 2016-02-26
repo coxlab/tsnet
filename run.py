@@ -5,7 +5,7 @@ import warnings; warnings.filterwarnings('ignore')
 import math, numpy as np
 
 from config import *
-from core.network import *
+from core.network import NET
 
 def main(mainarg):
 
@@ -13,15 +13,13 @@ def main(mainarg):
 
 	## Load Settings
 
-	settings = parser.parse_args(mainarg); np.random.seed(settings.seed)
-
-	settings.peperr      = (settings.lcalg == 1)
-	settings.pretrain[0] = 0 if settings.mcalg != 0 else settings.pretrain[0]
+	settings        = parser.parse_args(mainarg); np.random.seed(settings.seed)
+	settings.peperr = (settings.lcalg == 1)
 
 	## Load Dataset
 
-	if   settings.dataset == 'mnist'  : from datasets.mnist   import XT, YT, Xv, Yv, Xt, Yt, NC, aug
-	elif settings.dataset == 'cifar10': from datasets.cifar10 import XT, YT, Xv, Yv, Xt, Yt, NC, aug
+	if   settings.dataset == 'mnist'  : from datasets.mnist   import XT, YT, Xv, Yv, Xt, Yt, NC, aug, prp
+	elif settings.dataset == 'cifar10': from datasets.cifar10 import XT, YT, Xv, Yv, Xt, Yt, NC, aug, prp
 
 	def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
@@ -31,33 +29,29 @@ def main(mainarg):
 
 	## Load Network
 
-	net = NET(spec2hp(settings.network), XT.shape[1], settings.pretrain[0]); net.save(settings.save)
+	net = NET(spec2hp(settings.network))
 
-	NL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'NORM'                   ]
-	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV'                   ]
-	EL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV' and net.layer[l].e]
+	CL = [l for l in xrange(len(net.layer)) if net.layer[l].__class__.__name__ == 'CONV']
 
 	## Load Classifier
 
 	if settings.lcparam == LC_DEFAULT: settings.lcparam = LC_DEFAULT[settings.lcalg]
 
-	if   settings.lcalg == 0: from classifier.exact import Linear; lcarg = ()
-	elif settings.lcalg == 1: from classifier.asgd  import Linear; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
+	if   settings.lcalg == 0: from classifier.exact import LINEAR; lcarg = ()
+	elif settings.lcalg == 1: from classifier.asgd  import LINEAR; lcarg = tuple(settings.lcparam); settings.lcparam = [0]
 
 	if   settings.mcalg == 0: from classifier.formatting import ovr ; enc, dec = ovr (NC)
 	elif settings.mcalg == 1: from classifier.formatting import ovo ; enc, dec = ovo (NC)
 	elif settings.mcalg == 2: from classifier.formatting import ecoc; enc, dec = ecoc(NC)
 
-	classifier = Linear(*lcarg)
+	classifier = LINEAR(*lcarg)
 
 	## Check Memory Usage
 
-	if settings.limit >= 0:
+	usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], settings.batchsize, enc(0)) / 1024.0**2
 
-		usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], settings.batchsize, enc(0)) / 1024.0**2
-
-		print('Estimated Memory Usage = %.2f MB' % usage)
-		if usage > settings.limit > 0: raise MemoryError('Over Limit!')
+	print('Estimated Memory Usage = %.2f MB' % usage)
+	if usage > settings.limit > 0: raise MemoryError('Over Limit!')
 
 	## Define Epoch
 
@@ -71,21 +65,19 @@ def main(mainarg):
 
 				Xb = X[i:i+settings.batchsize]; smp += Xb.shape[0]
 				Yb = Y[i:i+settings.batchsize]
+
 				Xb = aug(Xb) if aug is not None else Xb
+				Xb = prp(Xb)
 
-				if mode == 'pretrain':
+				Zb = net.forward(Xb)
 
-					net.forward (Xb,          net.pL           )
-					net.pretrain(enc(Yb), net.pL, mode='update')
+				if mode == 'train':
 
-				elif mode == 'train':
-
-					Zb = net.forward(Xb); classifier.update(Zb, enc(Yb))
+					classifier.update(Zb, enc(Yb))
 					err += np.count_nonzero(dec(classifier.infer(  )) != Yb) if settings.peperr else 0
 
 				elif mode == 'test':
 
-					Zb = net.forward(Xb)
 					err += np.count_nonzero(dec(classifier.infer(Zb)) != Yb)
 
 				if not settings.quiet:
@@ -103,35 +95,17 @@ def main(mainarg):
 
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
 
-		if   mode == 'pretrain': net.pretrain(None, net.pL, mode='solve')
-		else                   : return err
+		return err
 
 	## Start
+
+	net.save(settings.save)
 
 	print('Preparation Done')
 	print('-' * 55 + ' ' + time.ctime())
 
 	val = bval = fval = float('inf')
 	tst = btst = ftst = float('inf')
-
-	## Pretraining
-
-	if any(settings.pretrain):
-
-		for l in sorted(NL + CL):
-
-			if   l in CL and not settings.pretrain[0]: continue
-			elif l in NL and not settings.pretrain[1]: continue
-
-			print('Pretraining Network Layer %d' % (l+1)); net.pL = l+1
-
-			XT, YT = shuffle(XT, YT)
-			pN     = XT.shape[0] * settings.pretrain[0 if l in CL else 1]
-
-			process(XT[:pN], YT[:pN], mode='pretrain')
-
-		if settings.pretrain[0]: net.save(settings.save)
-		print('-' * 55 + ' ' + time.ctime())
 
 	## Training
 
@@ -166,11 +140,11 @@ def main(mainarg):
 
 			classifier.solve(settings.lcparam[-1])
 
-			net.train(classifier.get(), EL, settings.lrnrate[0])
+			net.train(classifier.get(), CL, settings.lrnrate[0])
 			net.save (settings.save)
 
 			settings.lrnrate = settings.lrnrate[1:]
-			classifier       = Linear(*lcarg)
+			classifier       = LINEAR(*lcarg)
 
 		print('-' * 55 + ' ' + time.ctime())
 

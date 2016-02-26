@@ -9,7 +9,7 @@ one = np.ones(1, dtype='float32')
 def nescale(X, a   ): ne.evaluate('a * X'    , out=X)
 def newtsum(Y, a, X): ne.evaluate('a * X + Y', out=Y)
 
-class Linear():
+class LINEAR():
 
 	def __init__(self, l2r, ss, t0): 
 

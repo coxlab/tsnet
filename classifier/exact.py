@@ -4,7 +4,7 @@ import numpy as np
 from scipy.linalg.blas import ssyrk
 from scipy.linalg.lapack import sposv
 
-class Linear():
+class LINEAR():
 
 	def __init__(self): self.SII, self.SIO, self.WZ = (None,)*3
 

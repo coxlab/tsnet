@@ -1,6 +1,8 @@
 import numpy as np
 import os, cPickle
 
+from datasets.augmentation import *
+
 NC     = 10
 dsdir  = os.path.dirname(__file__)
 dsdir += '/' if dsdir else ''
@@ -14,10 +16,8 @@ XT = XT.reshape(XT.shape[0], 1, 28, 28).astype('float32') / 255
 Xv = Xv.reshape(Xv.shape[0], 1, 28, 28).astype('float32') / 255
 Xt = Xt.reshape(Xt.shape[0], 1, 28, 28).astype('float32') / 255
 
-#Xm  = np.mean(XT, 0)[None]
-#XT -= Xm
-#Xv -= Xm
-#Xt -= Xm
+Xm = np.mean(XT, 0)[None]
 
-from datasets.augmentation import *
+def prp(X       ): return X - Xm
 def aug(X, r=1.0): return rand_scl(rand_rot(X, 20*r), 0.1*r)
+
