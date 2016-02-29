@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial.distance import cosine
 
 from core.layers import CONV, MPOL, RELU, PADD
-from core.operations import collapse, reconstruction
+from core.operations import collapse, uncollapse
 from tools import symm, syrk, reigh, savemats
 
 def decomp(W, Wref):
@@ -44,10 +44,13 @@ class NET():
 
 	def forward(self, X, L=None):
 
+		Z = np.copy(X)
 		L = len(self.layer) if L is None else L
-		Z = X #np.copy(X)
 
-		for l in xrange(L): X, Z = self.layer[l].forward(X, Z)
+		for l in xrange(L):
+
+			X = self.layer[l].forward(X)
+			Z = self.layer[l].switch (Z)
 
 		return Z
 
@@ -73,7 +76,7 @@ class NET():
 			self.layer[l].W += E * dW
 			self.layer[l].W *= E / np.linalg.norm(self.layer[l].W)
 
-			dZ, Z = reconstruction(dZ, self.layer[l].W), Z[:-1]
+			dZ, Z = uncollapse(dZ, self.layer[l].W, kd=True), Z[:-1]
 
 	def save(self, fn):
 
