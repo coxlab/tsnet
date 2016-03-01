@@ -42,6 +42,7 @@ class NET():
 
 			else: raise TypeError('Undefined Type in Layer {0}!'.format(str(l+1)))
 
+	#@profile
 	def forward(self, X, L=None):
 
 		Z = np.copy(X)
@@ -49,10 +50,19 @@ class NET():
 
 		for l in xrange(L):
 
-			X = self.layer[l].forward(X)
-			Z = self.layer[l].switch (Z)
+			X = self.layer[l].forward(X, mode='X')
+			Z = self.layer[l].forward(Z, mode='Z')
 
-		return Z
+		O = Z
+		#X = np.random.randn(*X.shape).astype('float32')
+		#Z = np.random.randn(*Z.shape).astype('float32')
+
+		#for l in reversed(xrange(L)):
+
+			#X = self.layer[l].backward(X, mode='X')
+			#Z = self.layer[l].backward(Z, mode='Z')
+
+		return O
 
 	def train(self, Z, L, rate):
 

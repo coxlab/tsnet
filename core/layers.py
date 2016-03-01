@@ -1,7 +1,7 @@
 import numpy as np
 import numexpr as ne
 
-from core.operations import expand, collapse
+from core.operations import expand, collapse, uncollapse, unexpand
 
 def indices(shape): # memory efficient np.indices
 
@@ -20,38 +20,37 @@ class CONV:
 		self.w    = w
 		self.w[1] = w[1] if sh is None else sh[1]
 		self.s    = s
-		self.W    = None if sh is None else np.random.randn(*w).astype('float32')
-		self.o    = None if sh is None else [((sh[2]-1) % s[0]) / 2, ((sh[3]-1) % s[1]) / 2]
 		self.sh   = sh
+
+		self.W = None if sh is None else np.random.randn(*w).astype('float32')
+		self.S = None if sh is None else (slice(None), slice(None), slice(((sh[2]-1) % s[0]) / 2, None, s[0]), slice(((sh[3]-1) % s[1]) / 2, None, s[1]))
 
 		if self.W is not None: self.WN += [self.W]
 
-	## X Pathway
+	def forward(self, T, mode='X'):
 
-	def forward(self, X):
+		if self.W is None: self.__init__(self.w, self.s, sh=T.shape[:4])
 
-		if self.W is None: self.__init__(self.w, self.s, sh=X.shape)
+		T = expand(T, tuple(self.w[1:]))
+		T = T[self.S]
+		T = collapse(T, self.W) if mode == 'X' else T
 
-		X = expand(X, self.W.shape[1:])
-		X = X[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
-		X = collapse(X, self.W)
+		return T
 
-		return X
+	#@profile
+	def backward(self, T, mode='X'):
 
-	def backward(self, D): pass
+		if mode == 'X': T = uncollapse(T, self.W)
+		else          : T = np.sum(T, 1)[:,None] ## OR NE?
 
-	## Z Pathway
+		O = np.zeros((self.sh[0], 1) + (self.sh[2]-self.w[2]+1, self.sh[3]-self.w[3]+1) + tuple(self.w[1:]) + T.shape[7:], dtype='float32')
 
-	def switch(self, Z):
+		O[self.S] = T
+		O         = unexpand(O)
 
-		Z = expand(Z, self.W.shape[1:])
-		Z = Z[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
+		return O
 
-		return Z
-
-	def unswitch(self, D): pass
-
-	def fastforward (self, Z): pass
+	def fastforward(self, Z): pass
 	def fastbackward(self, D): pass
 
 class MPOL:
@@ -60,44 +59,32 @@ class MPOL:
 
 		self.w  = w
 		self.s  = s
-		self.o  = None if sh is None else [((sh[2]-1) % s[0]) / 2, ((sh[3]-1) % s[1]) / 2]
 		self.sh = sh
 
-	## X Pathway
+		self.S = None if sh is None else (slice(None), slice(None), slice(((sh[2]-1) % s[0]) / 2, None, s[0]), slice(((sh[3]-1) % s[1]) / 2, None, s[1]))
 
-	def forward(self, X):
+	def forward(self, T, mode='X'):
 
-		if self.o is None: self.__init__(self.w, self.s, sh=X.shape)
+		if self.S is None: self.__init__(self.w, self.s, sh=T.shape[:4])
 
-		X = expand(X, (1,)+tuple(self.w)).squeeze(4)
-		X = X[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
+		T = expand(T, (1,)+tuple(self.w)).squeeze(4)
+		T = T[self.S]
+		T = expand(T, (self.sh[1],)) if mode == 'Z' else T
 
-		self.I = indices(X.shape[:-2]) + np.unravel_index(np.argmax(X.reshape(X.shape[:-2]+(-1,)), -1), tuple(self.w))
+		if mode == 'X': self.I = indices(T.shape[:-2]) + np.unravel_index(np.argmax(T.reshape(T.shape[:-2]+(-1,)), -1), tuple(self.w))
 
-		return X[self.I]
+		return T[self.I]
 
-	def backward(self, D):
+	#@profile
+	def backward(self, T, mode=None):
 
-		O = np.zeros(self.sh[:2] + (self.sh[3]-self.w[0]+1, self.sh(4)-self.w[1]+1) + tuple(self.w), dtype='float32')
-		O[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]][self.I] = D
+		O = np.zeros(self.sh[:2] + (self.sh[2]-self.w[0]+1, self.sh[3]-self.w[1]+1) + tuple(self.w) + T.shape[4:], dtype='float32')
 
-		O = np.rollaxis(O, 1, 4)
-		O = np.reshape (O, (O.shape[0], 1) + O.shape[1:])
-		O = unexpand(O)
+		O[self.S][self.I] = T
+		O                 = np.rollaxis(O, 1, 4)[:,None]
+		O                 = unexpand(O)
 
 		return O
-
-	## Z Pathway
-
-	def switch(self, Z):
-
-		Z = expand(Z, (1,)+tuple(self.w)).squeeze(4)
-		Z = Z[:,:,self.o[0]::self.s[0],self.o[1]::self.s[1]]
-		Z = expand(Z, (self.sh[1],)) # 2nd-stage expansion
-
-		return Z[self.I]
-
-	def unswitch(self, D): pass
 
 class RELU:
 
@@ -105,31 +92,26 @@ class RELU:
 
 		self.sh = sh
 
-	## X Pathway
+	def forward(self, T, mode='X'):
 
-	def forward(self, X):
+		if self.sh is None: self.__init__(sh=T.shape[:4])
 
-		if self.sh is None: self.__init__(sh=X.shape)
+		T = expand(T, (self.sh[1],)) if mode == 'Z' else T
 
-		I = self.I = X <= 0
-		X = ne.evaluate('where(I, 0, X)', order='C')
+		if mode == 'X': I = self.I = T <= 0
+		else          : I = self.I.reshape(self.I.shape + (1,)*(T.ndim-4))
 
-		return X
+		T = ne.evaluate('where(I, 0, T)', order='C')
 
-	def backward(self, D): pass
+		return T
 
-	## Z Pathway
+	#@profile
+	def backward(self, T, mode=None):
 
-	def switch(self, Z):
+		I = self.I.reshape(self.I.shape + (1,)*(T.ndim-4))
+		T = ne.evaluate('T*I', order='C')
 
-		Z = expand(Z, (self.sh[1],)) # 2nd-stage expansion
-
-		I = self.I.reshape(self.I.shape + (1,)*(Z.ndim-4))
-		Z = ne.evaluate('where(I, 0, Z)', order='C')
-
-		return Z
-
-	def unswitch(self, D): pass
+		return T
 
 class PADD:
 
@@ -137,15 +119,14 @@ class PADD:
 
 		self.p = p
 
-	def forward(self, T):
+	def forward(self, T, mode=None):
 
 		p = [0,0] * 2 + self.p + [0,0] * (T.ndim-4)
 		T = np.pad(T, zip(p[0::2], p[1::2]), 'constant')
 
 		return T
 
-	def backward(self, D): pass
+	def backward(self, T, mode=None):
 
-	switch   = forward
-	unswitch = backward
+		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
