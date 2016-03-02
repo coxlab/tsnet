@@ -1,5 +1,6 @@
 import numpy as np
 import numexpr as ne
+from numpy.lib.stride_tricks import as_strided
 
 from core.operations import expand, collapse, uncollapse, unexpand
 
@@ -13,7 +14,7 @@ def indices(shape): # memory efficient np.indices
 
 class CONV:
 
-	WN = [] # shared across all layers in network
+	#WN = [] # shared across all layers in network
 
 	def __init__(self, w, s=[1,1], sh=None):
 
@@ -25,7 +26,7 @@ class CONV:
 		self.W = None if sh is None else np.random.randn(*w).astype('float32')
 		self.S = None if sh is None else (slice(None), slice(None), slice(((sh[2]-1) % s[0]) / 2, None, s[0]), slice(((sh[3]-1) % s[1]) / 2, None, s[1]))
 
-		if self.W is not None: self.WN += [self.W]
+		#if self.W is not None: self.WN += [self.W]
 
 	def forward(self, T, mode='X'):
 
@@ -33,25 +34,31 @@ class CONV:
 
 		T = expand(T, tuple(self.w[1:]))
 		T = T[self.S]
-		T = collapse(T, self.W) if mode == 'X' else T
+
+		#if 'G' in mode and 'X' in mode:
+
+		T = collapse(T, self.W) if 'X' in mode else T
 
 		return T
 
 	#@profile
 	def backward(self, T, mode='X'):
 
-		if mode == 'X': T = uncollapse(T, self.W)
-		else          : T = np.sum(T, 1)[:,None] ## OR NE?
+		#if 'G' in mode:
+
+		if 'X' in mode: T = uncollapse(T, self.W)
+		else          : T = np.sum(T, 1)[:,None]
 
 		O = np.zeros((self.sh[0], 1) + (self.sh[2]-self.w[2]+1, self.sh[3]-self.w[3]+1) + tuple(self.w[1:]) + T.shape[7:], dtype='float32')
 
-		O[self.S] = T
-		O         = unexpand(O)
+		_ = ne.evaluate('T', out=O[self.S]) #O[self.S] = T
+		O = unexpand(O)
 
 		return O
 
-	def fastforward(self, Z): pass
-	def fastbackward(self, D): pass
+	def fastforward(self, T, mode='Z'): pass
+
+	def fastbackward(self, T, mode='Z'): pass
 
 class MPOL:
 
@@ -69,9 +76,9 @@ class MPOL:
 
 		T = expand(T, (1,)+tuple(self.w)).squeeze(4)
 		T = T[self.S]
-		T = expand(T, (self.sh[1],)) if mode == 'Z' else T
+		T = expand(T, (self.sh[1],)) if 'Z' in mode else T
 
-		if mode == 'X': self.I = indices(T.shape[:-2]) + np.unravel_index(np.argmax(T.reshape(T.shape[:-2]+(-1,)), -1), tuple(self.w))
+		if 'X' in mode: self.I = indices(T.shape[:-2]) + np.unravel_index(np.argmax(T.reshape(T.shape[:-2]+(-1,)), -1), tuple(self.w))
 
 		return T[self.I]
 
@@ -80,9 +87,14 @@ class MPOL:
 
 		O = np.zeros(self.sh[:2] + (self.sh[2]-self.w[0]+1, self.sh[3]-self.w[1]+1) + tuple(self.w) + T.shape[4:], dtype='float32')
 
-		O[self.S][self.I] = T
-		O                 = np.rollaxis(O, 1, 4)[:,None]
-		O                 = unexpand(O)
+		T = T[:,:,:,:,None,None]
+		T = as_strided (T, T.shape[:4] + tuple(self.w) + T.shape[6:], T.strides)
+		I = np.zeros   (T.shape, dtype='bool'); I[self.I] = True
+		T = ne.evaluate('where(I, T, 0)')
+
+		_ = ne.evaluate('T', out=O[self.S]) #O[self.S] = T
+		O = np.rollaxis(O, 1, 4)[:,None]
+		O = unexpand(O)
 
 		return O
 
@@ -96,9 +108,9 @@ class RELU:
 
 		if self.sh is None: self.__init__(sh=T.shape[:4])
 
-		T = expand(T, (self.sh[1],)) if mode == 'Z' else T
+		T = expand(T, (self.sh[1],)) if 'Z' in mode else T
 
-		if mode == 'X': I = self.I = T <= 0
+		if 'X' in mode: I = self.I = T <= 0
 		else          : I = self.I.reshape(self.I.shape + (1,)*(T.ndim-4))
 
 		T = ne.evaluate('where(I, 0, T)', order='C')
