@@ -50,17 +50,37 @@ class NET():
 
 		for l in xrange(L):
 
-			X = self.layer[l].forward(X, mode='X')
-			Z = self.layer[l].forward(Z, mode='Z')
+			X = self.layer[l].forward(X, mode='XG')
+			Z = self.layer[l].forward(Z, mode='Z ')
 
 		O = Z
-		#X = np.random.randn(*X.shape).astype('float32')
-		#Z = np.random.randn(*Z.shape).astype('float32')
+
+		#for l in xrange(L):
+
+		#	Z = self.layer[l].linearforward(Z, mode='ZG')
+
+		#print(Z.ravel())
+		#print(X.ravel())
+		#print(np.amax(np.abs(Z-X)))
+
+		#XG = ZG = np.random.randn(*X.shape).astype('float32')
 
 		#for l in reversed(xrange(L)):
 
-			#X = self.layer[l].backward(X, mode='X')
-			#Z = self.layer[l].backward(Z, mode='Z')
+		#	ZG = self.layer[l].linearbackward(ZG, mode='ZG')
+
+		#print(self.layer[2].G.ravel()[:10])
+
+		#for l in reversed(xrange(L)):
+
+			#XG = self.layer[l].backward(XG, mode='XG')
+			#ZG = self.layer[l].backward(ZG, mode='Z')
+
+		#print(self.layer[2].G.ravel()[:10])
+
+		#print(XG.ravel())
+		#print(ZG.ravel())
+		#print(np.amax(np.abs(ZG-XG)))
 
 		return O
 

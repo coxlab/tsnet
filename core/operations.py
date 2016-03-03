@@ -21,7 +21,7 @@ def expand(T, w):
 
 		sh = list(T.shape  ); sh[1] = w[0]
 		st = list(T.strides); st[1] = 0
-		T  = as_strided(T, sh, st)
+		T  = T if T.shape[1] == w[0] else as_strided(T, sh, st)
 
 	return T
 

@@ -14,8 +14,6 @@ def indices(shape): # memory efficient np.indices
 
 class CONV:
 
-	#WN = [] # shared across all layers in network
-
 	def __init__(self, w, s=[1,1], sh=None):
 
 		self.w    = w
@@ -26,8 +24,6 @@ class CONV:
 		self.W = None if sh is None else np.random.randn(*w).astype('float32')
 		self.S = None if sh is None else (slice(None), slice(None), slice(((sh[2]-1) % s[0]) / 2, None, s[0]), slice(((sh[3]-1) % s[1]) / 2, None, s[1]))
 
-		#if self.W is not None: self.WN += [self.W]
-
 	def forward(self, T, mode='X'):
 
 		if self.W is None: self.__init__(self.w, self.s, sh=T.shape[:4])
@@ -35,7 +31,7 @@ class CONV:
 		T = expand(T, tuple(self.w[1:]))
 		T = T[self.S]
 
-		#if 'G' in mode and 'X' in mode:
+		if 'X' in mode and 'G' in mode: self.X = T
 
 		T = collapse(T, self.W) if 'X' in mode else T
 
@@ -44,7 +40,11 @@ class CONV:
 	#@profile
 	def backward(self, T, mode='X'):
 
-		#if 'G' in mode:
+		if 'X' in mode and 'G' in mode:
+
+			X      = np.squeeze  (self.X, 1)
+			G      = T
+			self.G = np.tensordot(G, X, ([0,2,3],[0,1,2]))
 
 		if 'X' in mode: T = uncollapse(T, self.W)
 		else          : T = np.sum(T, 1)[:,None]
@@ -56,9 +56,24 @@ class CONV:
 
 		return O
 
-	def fastforward(self, T, mode='Z'): pass
+	def linearforward(self, T, mode='Z'):
 
-	def fastbackward(self, T, mode='Z'): pass
+		if 'G' in mode: self.Z = T
+
+		return collapse(T, self.W)
+
+	#@profile
+	def linearbackward(self, T, mode='Z'):
+
+		if 'G' in mode:
+
+			Z      = self.Z
+			G      = np.reshape (T, T.shape + (1,)*3)
+			G      = ne.evaluate('G*Z') # sum
+			G      = np.reshape (G, (-1,) + G.shape[-6:])
+			self.G = np.sum     (G, (0,2,3))
+
+		return uncollapse(T, self.W, kd=True)
 
 class MPOL:
 
@@ -98,6 +113,9 @@ class MPOL:
 
 		return O
 
+	def linearforward (self, T, mode='Z'): return T
+	def linearbackward(self, T, mode='Z'): return T
+
 class RELU:
 
 	def __init__(self, sh=None):
@@ -110,10 +128,10 @@ class RELU:
 
 		T = expand(T, (self.sh[1],)) if 'Z' in mode else T
 
-		if 'X' in mode: I = self.I = T <= 0
+		if 'X' in mode: I = self.I = T > 0
 		else          : I = self.I.reshape(self.I.shape + (1,)*(T.ndim-4))
 
-		T = ne.evaluate('where(I, 0, T)', order='C')
+		T = ne.evaluate('where(I, T, 0)', order='C')
 
 		return T
 
@@ -124,6 +142,9 @@ class RELU:
 		T = ne.evaluate('T*I', order='C')
 
 		return T
+
+	def linearforward (self, T, mode='Z'): return T
+	def linearbackward(self, T, mode='Z'): return T
 
 class PADD:
 
@@ -141,4 +162,7 @@ class PADD:
 	def backward(self, T, mode=None):
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
+
+	def linearforward (self, T, mode='Z'): return T
+	def linearbackward(self, T, mode='Z'): return T
 
