@@ -1,112 +1,61 @@
 import numpy as np
-from scipy.spatial.distance import cosine
 
-from core.layers import CONV, MPOL, RELU, PADD
-from core.operations import collapse, uncollapse
-from tools import symm, syrk, reigh, savemats
-
-def decomp(W, Wref):
-
-	C = np.zeros((np.prod(W.shape[-3:]),)*2 + (W.shape[1],), dtype='float32', order='F')
-
-	for c in xrange(C.shape[-1]):
-
-		syrk(W[:,c].reshape(-1, C.shape[0]), C[:,:,c])
-		symm(C[:,:,c])
-
-	C  = np.ascontiguousarray(np.rollaxis(C, -1))
-	Wo = []
-
-	for c in xrange(C.shape[0]):
-
-		V, _ = reigh(C[c], np.mean(C[np.arange(C.shape[0]) != c], 0))
-		V  = V[:,0].reshape(Wref[c].shape)
-		V *= np.sign(np.inner(V.ravel(), Wref[c].ravel()))
-
-		Wo += [V[None]]
-
-	return np.vstack(Wo)
+from core.layers import CONV, MPOL, RELU, SMAX, PADD, FLAT
+from tools import savemats
 
 class NET():
 
-	def __init__(self, hp):
+	def __init__(self, hp, nc=10):
 
 		self.layer = []
+		#self.seidx = [] # subspace expansion layers
 
 		for l in xrange(len(hp)):
 
-			if   hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]
+			if   hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]; #self.seidx += [l]
 			elif hp[l][0] == 'MPOL': self.layer += [MPOL(*hp[l][1:])]
 			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
 			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
 
 			else: raise TypeError('Undefined Type in Layer {0}!'.format(str(l+1)))
 
-	#@profile
-	def forward(self, X, L=None):
+		self.layer += [FLAT(  )]
+		self.layer += [CONV(nc)]
+		self.layer += [SMAX(  )]
 
-		Z = np.copy(X)
-		L = len(self.layer) if L is None else L
+	def forward(self, X, mode=''):
 
-		for l in xrange(L):
+		#Z = np.copy(X)
+
+		for l in xrange(len(self.layer)):
 
 			X = self.layer[l].forward(X, mode='XG')
-			Z = self.layer[l].forward(Z, mode='Z ')
+			#Z = self.layer[l].forward(Z, mode='Z')
 
-		O = Z
+		return X
 
-		#for l in xrange(L):
+	def backward(self, Y):
 
-		#	Z = self.layer[l].linearforward(Z, mode='ZG')
+		for l in reversed(xrange(len(self.layer))):
 
-		#print(Z.ravel())
-		#print(X.ravel())
-		#print(np.amax(np.abs(Z-X)))
+			Y = self.layer[l].backward(Y, mode='XG')
 
-		#XG = ZG = np.random.randn(*X.shape).astype('float32')
+		return self
 
-		#for l in reversed(xrange(L)):
+	def update(self):
 
-		#	ZG = self.layer[l].linearbackward(ZG, mode='ZG')
+		for l in xrange(len(self.layer)):
 
-		#print(self.layer[2].G.ravel()[:10])
+			if hasattr(self.layer[l], 'G'):
 
-		#for l in reversed(xrange(L)):
+				if not hasattr(self.layer[l], 'M'): self.layer[l].M = np.zeros_like(self.layer[l].W)
 
-			#XG = self.layer[l].backward(XG, mode='XG')
-			#ZG = self.layer[l].backward(ZG, mode='Z')
+				self.layer[l].M *= np.single(0.9)
+				self.layer[l].M -= np.single(0.0005) * self.layer[l].W
+				self.layer[l].M -= np.single(1 / 100.0) * self.layer[l].G
 
-		#print(self.layer[2].G.ravel()[:10])
-
-		#print(XG.ravel())
-		#print(ZG.ravel())
-		#print(np.amax(np.abs(ZG-XG)))
-
-		return O
-
-	def train(self, Z, L, rate):
-
-		Z = [Z]
-		for l in L: Z += [collapse(Z[-1], self.layer[l].W)]
-
-		dZ, Z = Z[-1], Z[:-1]
-
-		for l in L[::-1]:
-
-			dW  = np.reshape    (dZ, dZ.shape + (1,)*3) * Z[-1]
-			dW  = np.reshape    (dW, (-1,) + dW.shape[-6:])
-			#dW  = np.mean       (dW, (0,2,3))
-			dW = decomp(dW, np.mean(dW, (0,2,3)))
-			dW /= np.linalg.norm(dW)
-
-			E   = np.linalg.norm(self.layer[l].W)
-			#dW *= E / np.linalg.norm(np.mean(dW, (0,2,3)))
-			#self.layer[l].W = decomp(self.layer[l].W[None,:,None,None]+dW, self.layer[l].W)
-
-			self.layer[l].W += E * dW
-			self.layer[l].W *= E / np.linalg.norm(self.layer[l].W)
-
-			dZ, Z = uncollapse(dZ, self.layer[l].W, kd=True), Z[:-1]
+				self.layer[l].W += np.single(self.lrnrate) * self.layer[l].M
+				#print(np.linalg.norm(self.layer[l].W))
 
 	def save(self, fn):
 

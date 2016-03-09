@@ -19,6 +19,30 @@ def reigh(Ci, Cj=None):
 
 	return V[:,::-1], s[::-1]
 
+NC = 10 # Number of Classes
+CB = None # Code Book
+
+def ovr(C): # One-versus-Rest
+
+	global NC; NC = C
+
+	def encode(Y): # One-hot
+
+		global CB
+
+		if CB is None:
+
+			CB = np.zeros((NC, NC), dtype='float32')
+			CB[np.diag_indices(NC)] = 1
+
+		return CB[Y]
+
+	def decode(Y):
+
+		return np.argmax(Y, 1)
+
+	return encode, decode
+
 import os
 from scipy.io import savemat, loadmat
 

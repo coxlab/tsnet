@@ -32,7 +32,7 @@ def collapse(T, W):
 		W = np.reshape (W, (1,)*(T.ndim-6) + (W.shape[0],1,1) + W.shape[1:])
 		T = ne.evaluate('T*W', order='C')
 		T = np.reshape (T, T.shape[:-3] + (np.prod(T.shape[-3:]),))
-		T = ne.evaluate('sum(T, %d)' % (T.ndim-1), order='C') ## or NP
+		T = np.sum(T, -1)
 
 	else: # X ONLY (conv, before 2nd-stage expansion)
 
@@ -58,23 +58,7 @@ def uncollapse(T, W, kd=False):
 
 	return T
 
-#@profile
 def unexpand(T): # X AND Z (col2im)
-
-	#T = T.swapaxes(4, 1)
-	#T = T.squeeze (4   )
-	#T = T.swapaxes(4, 2).swapaxes(3, 1) if T.shape[4] > T.shape[2] else T
-
-	#T = np.rollaxis(T, 5)
-	#T = np.rollaxis(T, 5)
-	#p = [0, 0] * 4 + [0, T.shape[0]-1] + [0, T.shape[1]-1] + [0, 0] * (T.ndim-6)
-	#T = np.pad(T, zip(p[0::2], p[1::2]), 'constant')
-
-	#for y in xrange(T.shape[0]): T[y,:] = np.roll(T[y,:], y, 3)
-	#for x in xrange(T.shape[1]): T[:,x] = np.roll(T[:,x], x, 4)
-
-	#T = np.reshape (T, (-1,) + T.shape[2:])
-	#T = ne.evaluate('sum(T, 0)', order='C')
 
 	T = np.squeeze (T, 1)
 	T = np.rollaxis(T, 3, 1)

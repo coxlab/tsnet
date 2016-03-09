@@ -16,17 +16,20 @@ class CONV:
 
 	def __init__(self, w, s=[1,1], sh=None):
 
-		self.w    = w
-		self.w[1] = w[1] if sh is None else sh[1]
-		self.s    = s
-		self.sh   = sh
+		if type(w) is int: w = [w,0,0,0]
 
-		self.W = None if sh is None else np.random.randn(*w).astype('float32')
+		self.w  = w
+		self.s  = s
+		self.sh = sh
+
 		self.S = None if sh is None else (slice(None), slice(None), slice(((sh[2]-1) % s[0]) / 2, None, s[0]), slice(((sh[3]-1) % s[1]) / 2, None, s[1]))
+
+		self.w = [self.w[0]] + [sh[i] if sh is not None and self.w[i] == 0 else self.w[i] for i in [1,2,3]]
+		self.W = None if sh is None else np.random.randn(*self.w).astype('float32') / np.single(100.0) #np.sqrt(2.0 / np.prod(np.array(self.w)[[0,2,3]])).astype('float32')
 
 	def forward(self, T, mode='X'):
 
-		if self.W is None: self.__init__(self.w, self.s, sh=T.shape[:4])
+		if self.W is None: self.__init__(self.w, self.s, sh=T.shape)
 
 		T = expand(T, tuple(self.w[1:]))
 		T = T[self.S]
@@ -37,7 +40,6 @@ class CONV:
 
 		return T
 
-	#@profile
 	def backward(self, T, mode='X'):
 
 		if 'X' in mode and 'G' in mode:
@@ -56,20 +58,19 @@ class CONV:
 
 		return O
 
-	def linearforward(self, T, mode='Z'):
+	def subforward(self, T, mode='Z'):
 
 		if 'G' in mode: self.Z = T
 
 		return collapse(T, self.W)
 
-	#@profile
-	def linearbackward(self, T, mode='Z'):
+	def subbackward(self, T, mode='Z'): # 'R'
 
 		if 'G' in mode:
 
 			Z      = self.Z
 			G      = np.reshape (T, T.shape + (1,)*3)
-			G      = ne.evaluate('G*Z') # sum
+			G      = ne.evaluate('G*Z')
 			G      = np.reshape (G, (-1,) + G.shape[-6:])
 			self.G = np.sum     (G, (0,2,3))
 
@@ -87,7 +88,7 @@ class MPOL:
 
 	def forward(self, T, mode='X'):
 
-		if self.S is None: self.__init__(self.w, self.s, sh=T.shape[:4])
+		if self.S is None: self.__init__(self.w, self.s, sh=T.shape)
 
 		T = expand(T, (1,)+tuple(self.w)).squeeze(4)
 		T = T[self.S]
@@ -97,7 +98,6 @@ class MPOL:
 
 		return T[self.I]
 
-	#@profile
 	def backward(self, T, mode=None):
 
 		O = np.zeros(self.sh[:2] + (self.sh[2]-self.w[0]+1, self.sh[3]-self.w[1]+1) + tuple(self.w) + T.shape[4:], dtype='float32')
@@ -113,9 +113,6 @@ class MPOL:
 
 		return O
 
-	def linearforward (self, T, mode='Z'): return T
-	def linearbackward(self, T, mode='Z'): return T
-
 class RELU:
 
 	def __init__(self, sh=None):
@@ -124,7 +121,7 @@ class RELU:
 
 	def forward(self, T, mode='X'):
 
-		if self.sh is None: self.__init__(sh=T.shape[:4])
+		if self.sh is None: self.__init__(sh=T.shape)
 
 		T = expand(T, (self.sh[1],)) if 'Z' in mode else T
 
@@ -135,7 +132,6 @@ class RELU:
 
 		return T
 
-	#@profile
 	def backward(self, T, mode=None):
 
 		I = self.I.reshape(self.I.shape + (1,)*(T.ndim-4))
@@ -143,8 +139,23 @@ class RELU:
 
 		return T
 
-	def linearforward (self, T, mode='Z'): return T
-	def linearbackward(self, T, mode='Z'): return T
+class SMAX:
+
+	def forward(self, T, mode=''):
+
+		T -= np.amax(T, 1)[:,None]
+		T  = np.exp (T)
+		T /= np.sum (T, 1)[:,None]
+
+		if 'G' in mode: self.P = T
+
+		return T
+
+	def backward(self, T, mode=''):
+
+		if T.ndim != 4: T = T.reshape(T.shape[0], -1, 1, 1)
+
+		return self.P - T
 
 class PADD:
 
@@ -163,6 +174,19 @@ class PADD:
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
-	def linearforward (self, T, mode='Z'): return T
-	def linearbackward(self, T, mode='Z'): return T
+class FLAT:
+
+	def __init__(self, sh=None):
+
+		self.sh = sh
+
+	def forward(self, T, mode=None):
+
+		if self.sh is None: self.__init__(sh=T.shape)
+
+		return T.reshape(T.shape[0], -1, 1, 1)
+
+	def backward(self, T, mode=None):
+
+		return T.reshape(T.shape[0], *self.sh[1:])
 
