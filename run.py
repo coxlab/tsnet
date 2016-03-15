@@ -34,6 +34,7 @@ def main(mainarg):
 
 	net      = NET(spec2hp(settings.network), NC)
 	enc, dec = ovr(NC)
+	net.mode = settings.mode
 
 	## Check Memory Usage
 

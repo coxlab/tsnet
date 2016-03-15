@@ -25,7 +25,7 @@ class CONV:
 		self.S = None if sh is None else (slice(None), slice(None), slice(((sh[2]-1) % s[0]) / 2, None, s[0]), slice(((sh[3]-1) % s[1]) / 2, None, s[1]))
 
 		self.w = [self.w[0]] + [sh[i] if sh is not None and self.w[i] == 0 else self.w[i] for i in [1,2,3]]
-		self.W = None if sh is None else np.random.randn(*self.w).astype('float32') / np.single(100.0) #np.sqrt(2.0 / np.prod(np.array(self.w)[[0,2,3]])).astype('float32')
+		self.W = None if sh is None else np.random.randn(*self.w).astype('float32') * np.sqrt(2.0 / np.prod(np.array(self.w)[1:])).astype('float32')
 
 	def forward(self, T, mode='X'):
 
@@ -44,9 +44,10 @@ class CONV:
 
 		if 'X' in mode and 'G' in mode:
 
-			X      = np.squeeze  (self.X, 1)
-			G      = T
-			self.G = np.tensordot(G, X, ([0,2,3],[0,1,2]))
+			D       = T
+			X       = np.squeeze  (self.X, 1)
+			self.G  = np.tensordot(D, X, ([0,2,3],[0,1,2]))
+			self.G /= D.shape[0]
 
 		if 'X' in mode: T = uncollapse(T, self.W)
 		else          : T = np.sum(T, 1)[:,None]
@@ -68,15 +69,16 @@ class CONV:
 
 		if 'G' in mode:
 
-			Z      = self.Z
-			G      = np.reshape (T, T.shape + (1,)*3)
-			G      = ne.evaluate('G*Z')
-			G      = np.reshape (G, (-1,) + G.shape[-6:])
-			self.G = np.sum     (G, (0,2,3))
+			D       = np.reshape (T, T.shape + (1,)*3)
+			Z       = self.Z
+			self.G  = ne.evaluate('D*Z')
+			self.G  = np.reshape (G, (-1,) + G.shape[-6:])
+			self.G  = np.sum     (G, (0,2,3))
+			self.G /= D.shape[0]
 
 		return uncollapse(T, self.W, kd=True)
 
-class MPOL:
+class MXPL:
 
 	def __init__(self, w, s=[1,1], sh=None): 
 
@@ -98,7 +100,7 @@ class MPOL:
 
 		return T[self.I]
 
-	def backward(self, T, mode=None):
+	def backward(self, T, mode=''):
 
 		O = np.zeros(self.sh[:2] + (self.sh[2]-self.w[0]+1, self.sh[3]-self.w[1]+1) + tuple(self.w) + T.shape[4:], dtype='float32')
 
@@ -132,14 +134,14 @@ class RELU:
 
 		return T
 
-	def backward(self, T, mode=None):
+	def backward(self, T, mode=''):
 
 		I = self.I.reshape(self.I.shape + (1,)*(T.ndim-4))
 		T = ne.evaluate('T*I', order='C')
 
 		return T
 
-class SMAX:
+class SFMX:
 
 	def forward(self, T, mode=''):
 
@@ -153,8 +155,6 @@ class SMAX:
 
 	def backward(self, T, mode=''):
 
-		if T.ndim != 4: T = T.reshape(T.shape[0], -1, 1, 1)
-
 		return self.P - T
 
 class PADD:
@@ -163,14 +163,14 @@ class PADD:
 
 		self.p = p
 
-	def forward(self, T, mode=None):
+	def forward(self, T, mode=''):
 
 		p = [0,0] * 2 + self.p + [0,0] * (T.ndim-4)
 		T = np.pad(T, zip(p[0::2], p[1::2]), 'constant')
 
 		return T
 
-	def backward(self, T, mode=None):
+	def backward(self, T, mode=''):
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
@@ -180,13 +180,13 @@ class FLAT:
 
 		self.sh = sh
 
-	def forward(self, T, mode=None):
+	def forward(self, T, mode=''):
 
 		if self.sh is None: self.__init__(sh=T.shape)
 
 		return T.reshape(T.shape[0], -1, 1, 1)
 
-	def backward(self, T, mode=None):
+	def backward(self, T, mode=''):
 
 		return T.reshape(T.shape[0], *self.sh[1:])
 

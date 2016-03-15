@@ -1,6 +1,7 @@
 import numpy as np
 
-from core.layers import CONV, MPOL, RELU, SMAX, PADD, FLAT
+from core.layers import CONV, MXPL, RELU, SFMX, PADD, FLAT
+from core.optimizers import SGD, ADAM
 from tools import savemats
 
 class NET():
@@ -8,12 +9,11 @@ class NET():
 	def __init__(self, hp, nc=10):
 
 		self.layer = []
-		#self.seidx = [] # subspace expansion layers
 
 		for l in xrange(len(hp)):
 
-			if   hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]; #self.seidx += [l]
-			elif hp[l][0] == 'MPOL': self.layer += [MPOL(*hp[l][1:])]
+			if   hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]
+			elif hp[l][0] == 'MXPL': self.layer += [MXPL(*hp[l][1:])]
 			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
 			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
 
@@ -21,41 +21,51 @@ class NET():
 
 		self.layer += [FLAT(  )]
 		self.layer += [CONV(nc)]
-		self.layer += [SMAX(  )]
+		self.layer += [SFMX(  )]
 
 	def forward(self, X, mode=''):
 
-		#Z = np.copy(X)
+		if self.mode == 'Z':
+			Z = X
+			for L in self.layer[:-3]: X, Z = L.forward(X, mode='X' ), L.forward(Z, mode='Z')
 
-		for l in xrange(len(self.layer)):
-
-			X = self.layer[l].forward(X, mode='XG')
-			#Z = self.layer[l].forward(Z, mode='Z')
+			X = Z
+			for L in self.layer[-3:]: X    = L.forward(X, mode='XG')
+		else:
+			for L in self.layer     : X    = L.forward(X, mode='XG')
 
 		return X
 
 	def backward(self, Y):
 
-		for l in reversed(xrange(len(self.layer))):
+		if Y.ndim != 4: Y = Y.reshape(Y.shape[0], -1, 1, 1)
 
-			Y = self.layer[l].backward(Y, mode='XG')
+		if self.mode == 'Z':
+			for L in self.layer[-3:][::-1]: Y = L.backward(Y, mode='XG')
+		else:
+			for L in self.layer     [::-1]: Y = L.backward(Y, mode='XG')
 
 		return self
 
-	def update(self):
+	def update(self, decay=0.0005, method='SGD', param=[]):
+
+		method = method.upper()
+		stat   = []
 
 		for l in xrange(len(self.layer)):
 
 			if hasattr(self.layer[l], 'G'):
 
-				if not hasattr(self.layer[l], 'M'): self.layer[l].M = np.zeros_like(self.layer[l].W)
+				self.layer[l].W *= np.single(1.0 - decay)
 
-				self.layer[l].M *= np.single(0.9)
-				self.layer[l].M -= np.single(0.0005) * self.layer[l].W
-				self.layer[l].M -= np.single(1 / 100.0) * self.layer[l].G
+				if   method == 'SGD' : SGD (self.layer[l], *param)
+				elif method == 'ADAM': ADAM(self.layer[l], *param)
 
-				self.layer[l].W += np.single(self.lrnrate) * self.layer[l].M
-				#print(np.linalg.norm(self.layer[l].W))
+				else: raise TypeError('Undefined Optimizer!')
+
+				stat += [np.linalg.norm(self.layer[l].W)]
+
+		return stat
 
 	def save(self, fn):
 

@@ -4,6 +4,7 @@ import argparse; parser = argparse.ArgumentParser()
 
 parser.add_argument('-dataset', default='mnist'                )
 parser.add_argument('-network', default=['mnist_1l'], nargs='*')
+parser.add_argument('-mode'   , default='Z'                    )
 
 parser.add_argument('-epoch'    , type=int  , default=1  )
 parser.add_argument('-batchsize', type=int  , default=50 )
@@ -21,10 +22,10 @@ parser.add_argument('-limit', type=int, default=0            )
 
 ## Example Hyperparameter
 
-mnist_1l    = ['conv:100,0,7,7', 'mpol:7,7/4,4'] #+ ['relu']
-mnist_lenet = ['conv:20,0,5,5', 'mpol:2,2/2,2'] + ['conv:50,0,5,5', 'mpol:2,2/2,2'] + ['conv:500,0,4,4', 'relu']
+mnist_1l    = ['conv:100,0,7,7', 'mxpl:7,7/4,4'] #+ ['relu']
+mnist_lenet = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2'] + ['conv:500,0,4,4', 'relu']
 
-cifar10_1l = ['conv:100,0,9,9', 'mpol:9,9/5,5'] #+ ['relu']
+cifar10_1l = ['conv:100,0,9,9', 'mxpl:9,9/5,5'] #+ ['relu']
 
 ## Network Hyperparameter Parsing
 
