@@ -10,9 +10,16 @@ def indices(shape): # memory efficient np.indices
 	for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
 	return I
 
+class BASE:
+
+	def forward    (self, T, mode=''): return T
+	def backward   (self, T, mode=''): return T
+	def subforward (self, T, mode=''): return T
+	def subbackward(self, T, mode=''): return T
+
 ## Layers
 
-class CONV:
+class CONV(BASE):
 
 	def __init__(self, w, s=[1,1], sh=None):
 
@@ -63,22 +70,22 @@ class CONV:
 
 		if 'G' in mode: self.Z = T
 
-		return collapse(T, self.W)
+		return collapse(T, self.W, normalize='R' in mode)
 
-	def subbackward(self, T, mode='Z'): # 'R'
+	def subbackward(self, T, mode='Z'):
 
 		if 'G' in mode:
 
 			D       = np.reshape (T, T.shape + (1,)*3)
 			Z       = self.Z
 			self.G  = ne.evaluate('D*Z')
-			self.G  = np.reshape (G, (-1,) + G.shape[-6:])
-			self.G  = np.sum     (G, (0,2,3))
+			self.G  = np.reshape (self.G, (-1,) + self.G.shape[-6:])
+			self.G  = np.sum     (self.G, (0,2,3))
 			self.G /= D.shape[0]
 
-		return uncollapse(T, self.W, kd=True)
+		return uncollapse(T, self.W, keepdims=True)
 
-class MXPL:
+class MXPL(BASE):
 
 	def __init__(self, w, s=[1,1], sh=None): 
 
@@ -115,7 +122,7 @@ class MXPL:
 
 		return O
 
-class RELU:
+class RELU(BASE):
 
 	def __init__(self, sh=None):
 
@@ -141,7 +148,7 @@ class RELU:
 
 		return T
 
-class SFMX:
+class SFMX(BASE):
 
 	def forward(self, T, mode=''):
 
@@ -157,7 +164,7 @@ class SFMX:
 
 		return self.P - T
 
-class PADD:
+class PADD(BASE):
 
 	def __init__(self, p): 
 
@@ -174,7 +181,7 @@ class PADD:
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
-class FLAT:
+class FLAT(BASE):
 
 	def __init__(self, sh=None):
 

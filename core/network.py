@@ -17,22 +17,44 @@ class NET():
 			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
 			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
 
-			else: raise TypeError('Undefined Type in Layer {0}!'.format(str(l+1)))
+			else: raise NameError(hp[l][0])
 
 		self.layer += [FLAT(  )]
 		self.layer += [CONV(nc)]
 		self.layer += [SFMX(  )]
 
+		self.A, self.AR = slice(None    ), slice(None, None, -1) # all layers
+		self.F, self.FR = slice(None, -3), slice(-4  , None, -1) # feature layers
+		self.C, self.CR = slice(-3, None), slice(None, -4  , -1) # classifier layers
+
 	def forward(self, X, mode=''):
 
-		if self.mode == 'Z':
+		if 'X' in self.mode:
+
+			for L in self.layer[self.A]: X = L.forward(X, mode='XG')
+
+		elif 'Z' in self.mode:
+
 			Z = X
-			for L in self.layer[:-3]: X, Z = L.forward(X, mode='X' ), L.forward(Z, mode='Z')
+			for L in self.layer[self.F]: X, Z = L.forward(X, mode='X'), L.forward   (Z, mode='Z' )
+			for L in self.layer[self.F]:    Z =                         L.subforward(Z, mode='ZG')
 
 			X = Z
-			for L in self.layer[-3:]: X    = L.forward(X, mode='XG')
-		else:
-			for L in self.layer     : X    = L.forward(X, mode='XG')
+			for L in self.layer[self.C]: X = L.forward(X, mode='XG')
+
+		elif 'E' in self.mode:
+
+			Z = X
+			for L in self.layer[self.F]: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
+
+			X = Z
+			for L in self.layer[self.C]: X = L.forward(X, mode='XG')
+
+			if 'N' not in self.mode:
+
+				for L in self.layer[self.F]: Z = L.subforward(Z, mode='ZG') # here for simplicity
+
+		else: raise NameError(self.mode)
 
 		return X
 
@@ -40,14 +62,28 @@ class NET():
 
 		if Y.ndim != 4: Y = Y.reshape(Y.shape[0], -1, 1, 1)
 
-		if self.mode == 'Z':
-			for L in self.layer[-3:][::-1]: Y = L.backward(Y, mode='XG')
-		else:
-			for L in self.layer     [::-1]: Y = L.backward(Y, mode='XG')
+		if 'X' in self.mode:
 
-		return self
+			for L in self.layer[self.AR]: Y = L.backward(Y, mode='XG')
 
-	def update(self, decay=0.0005, method='SGD', param=[]):
+		elif 'Z' in self.mode:
+
+			for L in self.layer[self.CR]: Y = L.backward   (Y, mode='XG')
+			for L in self.layer[self.FR]: Y = L.subbackward(Y, mode='ZG')
+
+		elif 'E' in self.mode:
+
+			for L in self.layer[self.CR]: Y = L.backward(Y, mode='XG')
+
+			if 'N' not in self.mode:
+
+				for L in self.layer[self.F]: Y = L.subforward(Y, mode='ZR'); L.subbackward(Y, mode='ZG')
+
+		else: raise NameError(self.mode)
+
+		return Y
+
+	def update(self, decay=1e-3, method='ADAM', param=[]):
 
 		method = method.upper()
 		stat   = []
@@ -69,5 +105,5 @@ class NET():
 
 	def save(self, fn):
 
-		savemats(fn, [self.layer[l].W for l in xrange(len(self.layer)) if self.layer[l].__class__.__name__ == 'CONV'])
+		savemats(fn, [L.W for L in self.layer[self.F] if L.__class__.__name__ == 'CONV'])
 

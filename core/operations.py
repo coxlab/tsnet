@@ -25,14 +25,21 @@ def expand(T, w):
 
 	return T
 
-def collapse(T, W):
+def collapse(T, W, normalize=False):
 
 	if T.shape[-6] == W.shape[0]: # Z ONLY (after 2nd-stage expansion)
 
 		W = np.reshape (W, (1,)*(T.ndim-6) + (W.shape[0],1,1) + W.shape[1:])
-		T = ne.evaluate('T*W', order='C')
+		T = ne.evaluate('T*W')
 		T = np.reshape (T, T.shape[:-3] + (np.prod(T.shape[-3:]),))
 		T = np.sum(T, -1)
+
+		if normalize:
+
+			W = np.reshape (W, W.shape[:-3] + (np.prod(W.shape[-3:]),))
+			W = np.square  (W)
+			W = np.sum     (W, -1)
+			T = ne.evaluate('T/W', out=T)
 
 	else: # X ONLY (conv, before 2nd-stage expansion)
 
@@ -44,9 +51,9 @@ def collapse(T, W):
 
 ## Backward Operations
 
-def uncollapse(T, W, kd=False):
+def uncollapse(T, W, keepdims=False):
 
-	if not kd: # X ONLY (deconv)
+	if not keepdims: # X ONLY (deconv)
 
 		T = np.tensordot(T, W, (-3, 0))[:,None]
 

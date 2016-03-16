@@ -34,7 +34,7 @@ def main(mainarg):
 
 	net      = NET(spec2hp(settings.network), NC)
 	enc, dec = ovr(NC)
-	net.mode = settings.mode
+	net.mode = settings.mode.upper()
 
 	## Check Memory Usage
 
@@ -62,7 +62,7 @@ def main(mainarg):
 				Lb   = net.forward(Xb, mode).sum((2,3))
 				err += np.count_nonzero(dec(Lb) != Yb)
 
-				if mode == 'train': net.backward(enc(Yb)).update()
+				if mode == 'train': net.backward(enc(Yb)); net.update()
 
 				if not settings.quiet:
 
