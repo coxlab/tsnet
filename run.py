@@ -47,7 +47,7 @@ def main(mainarg):
 
 	def process(X, Y, mode='train', aug=None):
 
-		smp = err = 0
+		smp = err = 0; stat = None
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
 
@@ -62,17 +62,18 @@ def main(mainarg):
 				Lb   = net.forward(Xb, mode).sum((2,3))
 				err += np.count_nonzero(dec(Lb) != Yb)
 
-				if mode == 'train': net.backward(enc(Yb)); net.update()
+				if mode == 'train': net.backward(enc(Yb)); stat = net.update()
 
 				if not settings.quiet:
 
 					t    = float(time.time() - t)
-					msg  = 'Batch %d/%d '   % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
+					msg  = 'Batch %d/%d ' % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
 					msg += '['
-					msg += 'ER = %e; '      % (float(err) / smp) if mode == 'train' else ''
-					msg += 't = %.2f Sec '  % t
-					msg += '(%.2f Img/Sec)' % (Xb.shape[0] / t)
+					msg += 'p(Error) = %.2e; '       % (float(err) / smp)
+					msg += '|W|/|G| = %.2e/%.2e; '   % (np.mean(stat['W']), np.mean(stat['G'])) if stat is not None else ''
+					msg += '%.2f Sec (%.2f Img/Sec)' % (t, Xb.shape[0] / t)
 					msg += ']'
+
 					print(msg, end='\r'); #sys.stdout.flush()
 
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)

@@ -83,23 +83,24 @@ class NET():
 
 		return Y
 
-	def update(self, decay=1e-3, method='ADAM', param=[]):
+	def update(self, decay=1e-6, method='SGD', param=[]):
 
 		method = method.upper()
-		stat   = []
+		stat   = {'W':[], 'G':[]}
 
-		for l in xrange(len(self.layer)):
+		for L in self.layer[self.A]:
 
-			if hasattr(self.layer[l], 'G'):
+			if hasattr(L, 'G'):
 
-				self.layer[l].W *= np.single(1.0 - decay)
+				L.W *= np.single(1.0 - decay)
 
-				if   method == 'SGD' : SGD (self.layer[l], *param)
-				elif method == 'ADAM': ADAM(self.layer[l], *param)
+				if   method == 'SGD' : SGD (L, *param)
+				elif method == 'ADAM': ADAM(L, *param)
 
 				else: raise TypeError('Undefined Optimizer!')
 
-				stat += [np.linalg.norm(self.layer[l].W)]
+				stat['W'] += [np.linalg.norm(L.W)]
+				stat['G'] += [np.linalg.norm(L.G)]
 
 		return stat
 

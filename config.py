@@ -23,7 +23,8 @@ parser.add_argument('-limit', type=int, default=0            )
 ## Example Hyperparameter
 
 mnist_1l    = ['conv:100,0,7,7', 'mxpl:7,7/4,4'] #+ ['relu']
-mnist_lenet = ['conv:10,0,5,5', 'mxpl:2,2/2,2'] + ['conv:10,0,5,5', 'mxpl:2,2/2,2'] #+ ['conv:500,0,4,4', 'relu']
+mnist_2l    = ['conv:10,0,5,5', 'mxpl:2,2/2,2'] + ['conv:10,0,5,5', 'mxpl:2,2/2,2']
+mnist_lenet = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2'] + ['conv:500,0,4,4', 'relu']
 
 cifar10_1l = ['conv:100,0,9,9', 'mxpl:9,9/5,5'] #+ ['relu']
 
