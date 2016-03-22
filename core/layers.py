@@ -12,7 +12,7 @@ def indices(shape): # memory efficient np.indices
 
 ## Representation Layers
 
-class BASE:
+class BASE():
 
 	def forward    (self, T, mode=''): return T
 	def backward   (self, T, mode=''): return T
@@ -165,37 +165,84 @@ class PADD(BASE):
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
-class FLAT(BASE):
+## Loss Layers
 
-	def __init__(self, sh=None):
+class LINR():
 
+	def __init__(self, n=10, sh=None):
+
+		self.n  = n
 		self.sh = sh
 
-	def forward(self, T, mode=''):
+		self.W = None if sh is None else np.zeros((np.prod(sh[1:]), n), dtype='float32')
+		self.C = None if sh is None else np.zeros((np.prod(sh[1:]), n), dtype='float32') # cache for self.G
 
-		if self.sh is None: self.__init__(sh=T.shape)
+	def forward(self, X, mode=''):
 
-		return T.reshape(T.shape[0], -1, 1, 1)
+		if self.W is None: self.__init__(n=self.n, sh=X.shape)
 
-	def backward(self, T, mode=''):
+		X = np.reshape(X, (X.shape[0], -1))
 
-		return T.reshape(T.shape[0], *self.sh[1:])
+		if 'G' in mode: self.X = X
 
-## Loss Layers
+		return np.dot(X, self.W)
+
+	def backward(self, X, mode=''):
+
+		if 'G' in mode:
+
+			self.G  = np.dot(self.X.T, X, out=self.C)
+			self.G /= X.shape[0]
+
+		X = np.dot    (X, self.W.T)
+		X = np.reshape(X, (X.shape[0],) + self.sh[1:])
+
+		return X
 
 class SFMX():
 
-	def forward(self, T, mode=''):
+	def __init__(self, n=10):
 
-		T -= np.amax(T, 1)[:,None]
-		T  = np.exp (T)
-		T /= np.sum (T, 1)[:,None]
+		self.CB                     = np.zeros((n, n), dtype='float32')
+		self.CB[np.diag_indices(n)] = 1
 
-		if 'G' in mode: self.P = T
+	def forward(self, X, mode=''):
 
-		return T
+		X -= np.amax  (X, 1)[:,None]
+		X  = np.exp   (X   )
+		X /= np.sum   (X, 1)[:,None]
+		Y  = np.argmax(X, 1)
 
-	def backward(self, T, mode=''):
+		if 'G' in mode: self.X = X
 
-		return self.P - T
+		return Y
+
+	def backward(self, Y, mode=''):
+
+		X = self.CB[Y]
+		X = self.X - X
+
+		return X
+
+class HNGE():
+
+	def __init__(self, n=10):
+
+		self.CB                     = -np.ones((n, n), dtype='float32')
+		self.CB[np.diag_indices(n)] = 1
+
+	def forward(self, X, mode=''):
+
+		Y = np.argmax(X, 1)
+
+		if 'G' in mode: self.X = X
+
+		return Y
+
+	def backward(self, Y, mode=''):
+
+		X = self.CB[Y]
+		X = (self.X * X < 1) * X
+
+		return X
 

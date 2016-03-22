@@ -1,8 +1,10 @@
 import numpy as np
 
-from core.layers import CONV, MXPL, RELU, SFMX, PADD, FLAT
+import os
+from scipy.io import savemat, loadmat
+
+from core.layers import CONV, MXPL, RELU, SFMX, PADD, LINR
 from core.optimizers import SGD, ADAM
-from tools import savemats
 
 class NET():
 
@@ -19,13 +21,13 @@ class NET():
 
 			else: raise NameError(hp[l][0])
 
-		self.layer += [FLAT(  )]
-		self.layer += [CONV(nc)]
-		self.layer += [SFMX(  )]
+		#self.layer += [FLAT(  )]
+		self.layer += [LINR(nc)]
+		self.layer += [SFMX(nc)]
 
 		self.A, self.AR = slice(None    ), slice(None, None, -1) # all layers
-		self.F, self.FR = slice(None, -3), slice(-4  , None, -1) # feature layers
-		self.C, self.CR = slice(-3, None), slice(None, -4  , -1) # classifier layers
+		self.F, self.FR = slice(None, -2), slice(-3  , None, -1) # feature layers
+		self.C, self.CR = slice(-2, None), slice(None, -3  , -1) # classifier layers
 
 	def forward(self, X, training=True):
 
@@ -60,8 +62,6 @@ class NET():
 
 	def backward(self, Y, training=True):
 
-		if Y.ndim != 4: Y = Y.reshape(Y.shape[0], -1, 1, 1)
-
 		if 'X' in self.mode:
 
 			for L in self.layer[self.AR]: Y = L.backward(Y, mode='XG')
@@ -81,12 +81,12 @@ class NET():
 
 		else: raise NameError(self.mode)
 
-		return Y
+		return self
 
 	def update(self, decay=1e-6, method='SGD', param=[]):
 
 		method = method.upper()
-		stat   = {'W':[], 'G':[]}
+		report = {'W':[], 'G':[]}
 
 		for L in self.layer[self.A]:
 
@@ -99,15 +99,33 @@ class NET():
 
 				else: raise TypeError('Undefined Optimizer!')
 
-				stat['W'] += [np.linalg.norm(L.W)]
-				stat['G'] += [np.linalg.norm(L.G)]
+				report['W'] += [np.linalg.norm(L.W)]
+				report['G'] += [np.linalg.norm(L.G)]
 
-		stat['W'] = np.linalg.norm(stat['W'])
-		stat['G'] = np.linalg.norm(stat['G'])
+		report['W'] = np.linalg.norm(report['W'])
+		report['G'] = np.linalg.norm(report['G'])
 
-		return stat
+		return report
 
 	def save(self, fn):
 
-		savemats(fn, [L.W for L in self.layer[self.F] if L.__class__.__name__ == 'CONV'])
+		if not fn: return
+
+		if os.path.isfile(fn): Ws = loadmat(fn)['Ws']
+		else                 : Ws = np.zeros(0, dtype=np.object)
+
+		for W in [L.W for L in self.layer[self.F] if L.__class__.__name__ == 'CONV']:
+
+			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
+			Ws[-1] = W
+
+		savemat(fn, {'Ws':Ws}, appendmat=False)
+
+	def size(self, batch):
+
+		self.forward (batch)
+		self.backward(np.zeros(batch.shape[0], dtype='uint8'))
+		#self.update
+
+		return sum([getattr(L, P).nbytes for L in self.layer for P in dir(L) if hasattr(getattr(L, P), 'nbytes')])
 

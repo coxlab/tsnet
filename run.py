@@ -2,11 +2,10 @@ from __future__ import print_function
 
 import sys, time, importlib
 import warnings; warnings.filterwarnings('ignore')
-import math, numpy as np
+import numpy as np
 
-from config import *
+from config import parser, spec2hp, expr2param
 from core.network import NET
-from tools import ovr
 
 def main(mainarg):
 
@@ -33,12 +32,13 @@ def main(mainarg):
 	## Load Network
 
 	net      = NET(spec2hp(settings.network), NC)
-	enc, dec = ovr(NC)
 	net.mode = settings.mode.upper()
 
 	## Check Memory Usage
 
-	usage = memest(net, [XT,YT,Xv,Yv,Xt,Yt], settings.batchsize, enc(0)) / 1024.0**2
+	usage  = net.size(np.zeros_like(XT[:settings.batchsize]))
+	usage += sum(subset.nbytes for subset in [XT,YT,Xv,Yv,Xt,Yt])
+	usage /= 1024.0**2
 
 	if usage > settings.limit > 0: raise MemoryError('Over Limit!')
 	else                         : print('Estimated Memory Usage = %.2f MB' % usage)
@@ -47,34 +47,31 @@ def main(mainarg):
 
 	def process(X, Y, trn=True, aug=None):
 
-		smp = err = 0; stat = None
+		err = prg = 0
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
 
-				if not settings.quiet: t = time.time()
+				tic = time.time()
 
-				Xb = X[i:i+settings.batchsize]; smp += Xb.shape[0]
+				Xb = X[i:i+settings.batchsize]; prg += Xb.shape[0]
 				Yb = Y[i:i+settings.batchsize]
 
 				Xb = aug(Xb) if aug is not None else Xb
 				Xb = prp(Xb)
 
-				Lb   = net.forward(Xb, trn).sum((2,3))
-				err += np.count_nonzero(dec(Lb) != Yb)
+				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
+				rep = net.backward(Yb).update() if trn else None
 
-				if trn: net.backward(enc(Yb)); stat = net.update()
+				toc  = time.time() - tic
 
-				if not settings.quiet:
+				msg  = 'Image %d/%d '            % (i+1, X.shape[0])
+				msg += '['
+				msg += 'p(Error) ~ %.2e; '       % (err / float(prg))
+				msg += '|W|/|G| ~ %.2e/%.2e; '   % (rep['W'], rep['G']) if rep is not None else ''
+				msg += '%.2f Sec (%.2f Img/Sec)' % (toc, Xb.shape[0] / toc)
+				msg += ']'
 
-					t    = float(time.time() - t)
-					msg  = 'Batch %d/%d ' % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
-					msg += '['
-					msg += 'p(Error) ~ %.2e; '       % (float(err) / smp)
-					msg += '|W|/|G| ~ %.2e/%.2e; '   % (stat['W'], stat['G']) if stat is not None else ''
-					msg += '%.2f Sec (%.2f Img/Sec)' % (t, Xb.shape[0] / t)
-					msg += ']'
-
-					print(msg, end='\r'); #sys.stdout.flush()
+				if not settings.quiet: print(msg, end='\r'); #sys.stdout.flush()
 
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
 
@@ -111,7 +108,7 @@ def main(mainarg):
 
 		print('-' * 55 + ' ' + time.ctime())
 
-	## Return Results
+	## Return
 
 	return val, bval, tst, btst
 
