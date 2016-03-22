@@ -10,14 +10,14 @@ def indices(shape): # memory efficient np.indices
 	for d, D in enumerate(shape): I = I + (np.arange(D).reshape((1,)*d+(-1,)+(1,)*(len(shape)-d-1)),)
 	return I
 
+## Representation Layers
+
 class BASE:
 
 	def forward    (self, T, mode=''): return T
 	def backward   (self, T, mode=''): return T
 	def subforward (self, T, mode=''): return T
 	def subbackward(self, T, mode=''): return T
-
-## Layers
 
 class CONV(BASE):
 
@@ -70,7 +70,7 @@ class CONV(BASE):
 
 		if 'G' in mode: self.Z = T
 
-		return collapse(T, self.W, normalize='R' in mode)
+		return collapse(T, self.W, divisive='R' in mode)
 
 	def subbackward(self, T, mode='Z'):
 
@@ -148,22 +148,6 @@ class RELU(BASE):
 
 		return T
 
-class SFMX(BASE):
-
-	def forward(self, T, mode=''):
-
-		T -= np.amax(T, 1)[:,None]
-		T  = np.exp (T)
-		T /= np.sum (T, 1)[:,None]
-
-		if 'G' in mode: self.P = T
-
-		return T
-
-	def backward(self, T, mode=''):
-
-		return self.P - T
-
 class PADD(BASE):
 
 	def __init__(self, p): 
@@ -196,4 +180,22 @@ class FLAT(BASE):
 	def backward(self, T, mode=''):
 
 		return T.reshape(T.shape[0], *self.sh[1:])
+
+## Loss Layers
+
+class SFMX():
+
+	def forward(self, T, mode=''):
+
+		T -= np.amax(T, 1)[:,None]
+		T  = np.exp (T)
+		T /= np.sum (T, 1)[:,None]
+
+		if 'G' in mode: self.P = T
+
+		return T
+
+	def backward(self, T, mode=''):
+
+		return self.P - T
 

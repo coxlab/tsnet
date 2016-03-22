@@ -27,7 +27,7 @@ class NET():
 		self.F, self.FR = slice(None, -3), slice(-4  , None, -1) # feature layers
 		self.C, self.CR = slice(-3, None), slice(None, -4  , -1) # classifier layers
 
-	def forward(self, X, mode=''):
+	def forward(self, X, training=True):
 
 		if 'X' in self.mode:
 
@@ -50,15 +50,15 @@ class NET():
 			X = Z
 			for L in self.layer[self.C]: X = L.forward(X, mode='XG')
 
-			if 'N' not in self.mode:
+			if training and 'N' not in self.mode:
 
-				for L in self.layer[self.F]: Z = L.subforward(Z, mode='ZG') # here for simplicity
+				for L in self.layer[self.F]: Z = L.subforward(Z, mode='ZG')
 
 		else: raise NameError(self.mode)
 
 		return X
 
-	def backward(self, Y):
+	def backward(self, Y, training=True):
 
 		if Y.ndim != 4: Y = Y.reshape(Y.shape[0], -1, 1, 1)
 
@@ -101,6 +101,9 @@ class NET():
 
 				stat['W'] += [np.linalg.norm(L.W)]
 				stat['G'] += [np.linalg.norm(L.G)]
+
+		stat['W'] = np.linalg.norm(stat['W'])
+		stat['G'] = np.linalg.norm(stat['G'])
 
 		return stat
 

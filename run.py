@@ -45,7 +45,7 @@ def main(mainarg):
 
 	## Define Epoch
 
-	def process(X, Y, mode='train', aug=None):
+	def process(X, Y, trn=True, aug=None):
 
 		smp = err = 0; stat = None
 
@@ -59,18 +59,18 @@ def main(mainarg):
 				Xb = aug(Xb) if aug is not None else Xb
 				Xb = prp(Xb)
 
-				Lb   = net.forward(Xb, mode).sum((2,3))
+				Lb   = net.forward(Xb, trn).sum((2,3))
 				err += np.count_nonzero(dec(Lb) != Yb)
 
-				if mode == 'train': net.backward(enc(Yb)); stat = net.update()
+				if trn: net.backward(enc(Yb)); stat = net.update()
 
 				if not settings.quiet:
 
 					t    = float(time.time() - t)
 					msg  = 'Batch %d/%d ' % (i / float(settings.batchsize) + 1, math.ceil(X.shape[0] / float(settings.batchsize)))
 					msg += '['
-					msg += 'p(Error) = %.2e; '       % (float(err) / smp)
-					msg += '|W|/|G| = %.2e/%.2e; '   % (np.mean(stat['W']), np.mean(stat['G'])) if stat is not None else ''
+					msg += 'p(Error) ~ %.2e; '       % (float(err) / smp)
+					msg += '|W|/|G| ~ %.2e/%.2e; '   % (stat['W'], stat['G']) if stat is not None else ''
 					msg += '%.2f Sec (%.2f Img/Sec)' % (t, Xb.shape[0] / t)
 					msg += ']'
 
@@ -99,10 +99,10 @@ def main(mainarg):
 		XT, YT      = shuffle(XT, YT)
 		net.lrnrate = settings.lrnrate[n] if n < len(settings.lrnrate) else settings.lrnrate[-1]
 
-		print(                                                        'TRN Error ~ %d' % process(XT, YT, aug=aug))
-		if settings.trnerr:                                     print('TRN Error = %d' % process(XT, YT, mode='test'))
-		if Xv.shape[0] > 0: val = process(Xv, Yv, mode='test'); print('VAL Error = %d' % val)
-		if Xt.shape[0] > 0: tst = process(Xt, Yt, mode='test'); print('TST Error = %d' % tst)
+		print(                                                      'TRN Error ~ %d' % process(XT, YT, aug=aug))
+		if settings.trnerr:                                   print('TRN Error = %d' % process(XT, YT, trn=False))
+		if Xv.shape[0] > 0: val = process(Xv, Yv, trn=False); print('VAL Error = %d' % val)
+		if Xt.shape[0] > 0: tst = process(Xt, Yt, trn=False); print('TST Error = %d' % tst)
 
 		if val < bval: bval = val
 		if tst < btst: btst = tst

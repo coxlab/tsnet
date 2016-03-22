@@ -25,7 +25,9 @@ def expand(T, w):
 
 	return T
 
-def collapse(T, W, normalize=False):
+def collapse(T, W, divisive=False):
+
+	if divisive: W = np.clip(np.reciprocal(W), -1e6, 1e6) / np.prod(W.shape[1:])
 
 	if T.shape[-6] == W.shape[0]: # Z ONLY (after 2nd-stage expansion)
 
@@ -33,13 +35,6 @@ def collapse(T, W, normalize=False):
 		T = ne.evaluate('T*W')
 		T = np.reshape (T, T.shape[:-3] + (np.prod(T.shape[-3:]),))
 		T = np.sum(T, -1)
-
-		if normalize:
-
-			W = np.reshape (W, W.shape[:-3] + (np.prod(W.shape[-3:]),))
-			W = np.square  (W)
-			W = np.sum     (W, -1)
-			T = ne.evaluate('T/W', out=T)
 
 	else: # X ONLY (conv, before 2nd-stage expansion)
 
