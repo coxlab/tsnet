@@ -3,10 +3,10 @@ import numpy as np
 import os
 from scipy.io import savemat, loadmat
 
-from core.layers import CONV, MXPL, RELU, SFMX, PADD, LINR
-from core.optimizers import SGD, ADAM
+from core.layers import CONV, MXPL, RELU, PADD, FLAT, FLCN, SFMX, HNGE
+from core.optimizers import SGD, ASGD, ADAM
 
-class NET():
+class NET:
 
 	def __init__(self, hp, nc=10):
 
@@ -21,91 +21,95 @@ class NET():
 
 			else: raise NameError(hp[l][0])
 
-		#self.layer += [FLAT(  )]
-		self.layer += [LINR(nc)]
-		self.layer += [SFMX(nc)]
+		self.layer += [FLAT(  )]
+		self.layer += [FLCN(nc)]
+		self.layer += [HNGE(nc)]
 
 		self.A, self.AR = slice(None    ), slice(None, None, -1) # all layers
-		self.F, self.FR = slice(None, -2), slice(-3  , None, -1) # feature layers
-		self.C, self.CR = slice(-2, None), slice(None, -3  , -1) # classifier layers
+		self.R, self.RR = slice(None, -3), slice(-4  , None, -1) # feature layers
+		self.L, self.LR = slice(-3, None), slice(None, -4  , -1) # classifier layers
 
 	def forward(self, X, training=True):
 
-		if 'X' in self.mode:
+		def auto(s): return s + ('G' if training else '')
 
-			for L in self.layer[self.A]: X = L.forward(X, mode='XG')
+		if self.mode == 0: # scalar
 
-		elif 'Z' in self.mode:
+			for L in self.layer[self.A]: X = L.forward(X, mode=auto('X'))
+
+			#Z = X
+			#for L in self.layer[self.R]: X, Z = L.forward(X, mode='X'), L.forward   (Z, mode=     'Z' )
+			#for L in self.layer[self.R]:    Z =                         L.subforward(Z, mode=auto('Z'))
+
+			#X = Z
+			#for L in self.layer[self.L]: X = L.forward(X, mode=auto('X'))
+
+		elif self.mode > 0: # subspace
 
 			Z = X
-			for L in self.layer[self.F]: X, Z = L.forward(X, mode='X'), L.forward   (Z, mode='Z' )
-			for L in self.layer[self.F]:    Z =                         L.subforward(Z, mode='ZG')
+			for L in self.layer[self.R]: X, Z = L.forward(X, mode=auto('X')), L.forward(Z, mode='Z')
+			#for L in self.layer[self.R]: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
 
 			X = Z
-			for L in self.layer[self.C]: X = L.forward(X, mode='XG')
+			for L in self.layer[self.L]: X = L.forward(X, mode=auto('X'))
 
-		elif 'E' in self.mode:
+			if training and self.mode != 2:
 
-			Z = X
-			for L in self.layer[self.F]: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
+				for L in self.layer[self.R]: Z = L.subforward(Z, mode=auto('Z'))
 
-			X = Z
-			for L in self.layer[self.C]: X = L.forward(X, mode='XG')
-
-			if training and 'N' not in self.mode:
-
-				for L in self.layer[self.F]: Z = L.subforward(Z, mode='ZG')
-
-		else: raise NameError(self.mode)
+		else: raise ValueError(self.mode)
 
 		return X
 
 	def backward(self, Y, training=True):
 
-		if 'X' in self.mode:
+		if self.mode == 0: # scalar
 
 			for L in self.layer[self.AR]: Y = L.backward(Y, mode='XG')
 
-		elif 'Z' in self.mode:
+			#for L in self.layer[self.LR]: Y = L.backward   (Y, mode='XG')
+			#for L in self.layer[self.RR]: Y = L.subbackward(Y, mode='ZG')
 
-			for L in self.layer[self.CR]: Y = L.backward   (Y, mode='XG')
-			for L in self.layer[self.FR]: Y = L.subbackward(Y, mode='ZG')
+		elif self.mode > 0: # subspace
 
-		elif 'E' in self.mode:
+			for L in self.layer[self.LR]: Y = L.backward(Y, mode='XG')
 
-			for L in self.layer[self.CR]: Y = L.backward(Y, mode='XG')
+			if self.mode != 2:
 
-			if 'N' not in self.mode:
+				for L in self.layer[self.R]: Y = L.subforward(Y, mode='ZR'); L.subbackward(Y, mode='ZG')
 
-				for L in self.layer[self.F]: Y = L.subforward(Y, mode='ZR'); L.subbackward(Y, mode='ZG')
-
-		else: raise NameError(self.mode)
+		else: raise ValueError(self.mode)
 
 		return self
 
-	def update(self, decay=1e-6, method='SGD', param=[]):
+	def update(self, method='SGD', param=[0,1e-3,1e-3,0.9]):
 
 		method = method.upper()
+
+		if   method == 'SGD' : optimize = SGD
+		elif method == 'ASGD': optimize = ASGD
+		elif method == 'ADAM': optimize = ADAM
+		else                 : raise NameError(method)
+
 		report = {'W':[], 'G':[]}
 
 		for L in self.layer[self.A]:
 
-			if hasattr(L, 'G'):
+			if not hasattr(L, 'G'): continue
 
-				L.W *= np.single(1.0 - decay)
+			optimize(L, *param)
 
-				if   method == 'SGD' : SGD (L, *param)
-				elif method == 'ADAM': ADAM(L, *param)
+			report['W'] += [np.linalg.norm(L.W)]
+			report['G'] += [np.linalg.norm(L.G)]
 
-				else: raise TypeError('Undefined Optimizer!')
-
-				report['W'] += [np.linalg.norm(L.W)]
-				report['G'] += [np.linalg.norm(L.G)]
+		param[0] += 1 # time
 
 		report['W'] = np.linalg.norm(report['W'])
 		report['G'] = np.linalg.norm(report['G'])
 
 		return report
+
+	def reset(self): pass # G, etc.
 
 	def save(self, fn):
 
@@ -114,7 +118,7 @@ class NET():
 		if os.path.isfile(fn): Ws = loadmat(fn)['Ws']
 		else                 : Ws = np.zeros(0, dtype=np.object)
 
-		for W in [L.W for L in self.layer[self.F] if L.__class__.__name__ == 'CONV']:
+		for W in [L.W for L in self.layer[self.R] if L.__class__.__name__ == 'CONV']:
 
 			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
 			Ws[-1] = W
@@ -127,5 +131,5 @@ class NET():
 		self.backward(np.zeros(batch.shape[0], dtype='uint8'))
 		#self.update
 
-		return sum([getattr(L, P).nbytes for L in self.layer for P in dir(L) if hasattr(getattr(L, P), 'nbytes')])
+		return sum([getattr(L, P).nbytes for L in self.layer[self.A] for P in dir(L) if hasattr(getattr(L, P), 'nbytes')])
 

@@ -1,15 +1,16 @@
 from __future__ import print_function
 
-import sys, time, importlib
+import sys, time, datetime
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np
 
-from config import parser, spec2hp, expr2param
+from config import parser, spec2hp
 from core.network import NET
 
 def main(mainarg):
 
 	print('-' * 55 + ' ' + time.ctime())
+	print('Initializing')
 
 	## Load Settings
 
@@ -32,7 +33,7 @@ def main(mainarg):
 	## Load Network
 
 	net      = NET(spec2hp(settings.network), NC)
-	net.mode = settings.mode.upper()
+	net.mode = settings.mode
 
 	## Check Memory Usage
 
@@ -40,18 +41,17 @@ def main(mainarg):
 	usage += sum(subset.nbytes for subset in [XT,YT,Xv,Yv,Xt,Yt])
 	usage /= 1024.0**2
 
-	if usage > settings.limit > 0: raise MemoryError('Over Limit!')
-	else                         : print('Estimated Memory Usage = %.2f MB' % usage)
+	if usage > settings.limit > 0: raise MemoryError(usage)
+	else                         : print('Memory Usage ~ %.2f MB' % usage)
 
 	## Define Epoch
 
 	def process(X, Y, trn=True, aug=None):
 
 		err = prg = 0
+		tic = time.time()
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
-
-				tic = time.time()
 
 				Xb = X[i:i+settings.batchsize]; prg += Xb.shape[0]
 				Yb = Y[i:i+settings.batchsize]
@@ -60,18 +60,19 @@ def main(mainarg):
 				Xb = prp(Xb)
 
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
-				rep = net.backward(Yb).update() if trn else None
+				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
-				toc  = time.time() - tic
+				if settings.quiet: continue
 
-				msg  = 'Image %d/%d '            % (i+1, X.shape[0])
-				msg += '['
-				msg += 'p(Error) ~ %.2e; '       % (err / float(prg))
-				msg += '|W|/|G| ~ %.2e/%.2e; '   % (rep['W'], rep['G']) if rep is not None else ''
-				msg += '%.2f Sec (%.2f Img/Sec)' % (toc, Xb.shape[0] / toc)
-				msg += ']'
+				toc = time.time()
+				rem = (toc - tic) * (X.shape[0] - prg) / prg
+				rem = str(datetime.timedelta(seconds=int(rem)))
 
-				if not settings.quiet: print(msg, end='\r'); #sys.stdout.flush()
+				msg  = 'p(Error) = %.2e '       % (err / float(prg))
+				msg += '& |W|/|G| = %.2e/%.2e ' % (rep['W'], rep['G']) if rep is not None else ''
+				msg += '[%.2f%% | %s left]'     % (100.0 * prg / X.shape[0], rem)
+
+				print(msg, end='\r'); #sys.stdout.flush()
 
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
 
@@ -82,9 +83,6 @@ def main(mainarg):
 	val = bval = float('inf')
 	tst = btst = float('inf')
 
-	settings.lrnrate = expr2param(settings.lrnrate)
-
-	print('Initialization Done')
 	print('-' * 55 + ' ' + time.ctime())
 
 	## Start
@@ -93,8 +91,7 @@ def main(mainarg):
 
 		print('Epoch %d/%d' % (n+1, settings.epoch))
 
-		XT, YT      = shuffle(XT, YT)
-		net.lrnrate = settings.lrnrate[n] if n < len(settings.lrnrate) else settings.lrnrate[-1]
+		XT, YT = shuffle(XT, YT)
 
 		print(                                                      'TRN Error ~ %d' % process(XT, YT, aug=aug))
 		if settings.trnerr:                                   print('TRN Error = %d' % process(XT, YT, trn=False))

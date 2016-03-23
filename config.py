@@ -4,13 +4,14 @@ import argparse; parser = argparse.ArgumentParser()
 
 parser.add_argument('-dataset', default='mnist'                )
 parser.add_argument('-network', default=['mnist_1l'], nargs='*')
-parser.add_argument('-mode'   , default='Z'                    )
 
-parser.add_argument('-epoch'    , type=int  , default=1  )
+parser.add_argument('-mode'     , type=int  , default=1  )
+parser.add_argument('-epoch'    , type=int  , default=10 )
 parser.add_argument('-batchsize', type=int  , default=100)
 parser.add_argument('-aug'      , type=float, default=0.0)
 
-parser.add_argument('-lrnrate', default=[1e-3], nargs='*')
+parser.add_argument('-lrnalg'  ,             default='sgd'                       )
+parser.add_argument('-lrnparam', type=float, default=[0,1e-3,1e-3,0.9], nargs='*')
 
 parser.add_argument('-trnerr', action='store_true')
 parser.add_argument('-quiet' , action='store_true')

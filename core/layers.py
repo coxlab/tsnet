@@ -12,7 +12,7 @@ def indices(shape): # memory efficient np.indices
 
 ## Representation Layers
 
-class BASE():
+class BASE:
 
 	def forward    (self, T, mode=''): return T
 	def backward   (self, T, mode=''): return T
@@ -43,7 +43,7 @@ class CONV(BASE):
 
 		if 'X' in mode and 'G' in mode: self.X = T
 
-		T = collapse(T, self.W) if 'X' in mode else T
+		T = collapse(T, self.W if 'G' in mode or not hasattr(self,'A') else self.A) if 'X' in mode else T
 
 		return T
 
@@ -167,82 +167,83 @@ class PADD(BASE):
 
 ## Loss Layers
 
-class LINR():
+class FLAT:
 
-	def __init__(self, n=10, sh=None):
+	def __init__(self, sh=None):
 
-		self.n  = n
 		self.sh = sh
 
-		self.W = None if sh is None else np.zeros((np.prod(sh[1:]), n), dtype='float32')
-		self.C = None if sh is None else np.zeros((np.prod(sh[1:]), n), dtype='float32') # cache for self.G
+	def forward(self, T, mode=''):
+
+		if self.sh is None: self.__init__(sh=T.shape)
+
+		return T.reshape(T.shape[0], -1)
+
+	def backward(self, T, mode=''):
+
+		return T.reshape(T.shape[0], *self.sh[1:])
+
+class FLCN:
+
+	def __init__(self, n=10, l=None):
+
+		self.n = n
+		self.l = l
+
+		self.W = None if l is None else np.zeros((l, n), dtype='float32')
 
 	def forward(self, X, mode=''):
 
-		if self.W is None: self.__init__(n=self.n, sh=X.shape)
-
-		X = np.reshape(X, (X.shape[0], -1))
+		if self.W is None: self.__init__(n=self.n, l=X.shape[1])
 
 		if 'G' in mode: self.X = X
 
-		return np.dot(X, self.W)
+		return np.dot(X, self.W if 'G' in mode or not hasattr(self,'A') else self.A)
 
 	def backward(self, X, mode=''):
 
 		if 'G' in mode:
 
-			self.G  = np.dot(self.X.T, X, out=self.C)
+			self.G  = np.dot(self.X.T, X, out=self.G if hasattr(self,'G') else None)
 			self.G /= X.shape[0]
 
-		X = np.dot    (X, self.W.T)
-		X = np.reshape(X, (X.shape[0],) + self.sh[1:])
+		return np.dot(X, self.W.T)
 
-		return X
-
-class SFMX():
+class SFMX:
 
 	def __init__(self, n=10):
 
-		self.CB                     = np.zeros((n, n), dtype='float32')
-		self.CB[np.diag_indices(n)] = 1
+		self.C = np.zeros((n, n), dtype='float32')
+		self.C[np.diag_indices(n)] = 1
 
 	def forward(self, X, mode=''):
 
 		X -= np.amax  (X, 1)[:,None]
 		X  = np.exp   (X   )
 		X /= np.sum   (X, 1)[:,None]
-		Y  = np.argmax(X, 1)
 
 		if 'G' in mode: self.X = X
 
-		return Y
+		return np.argmax(X, 1)
 
-	def backward(self, Y, mode=''):
+	def backward(self, X, mode=''):
 
-		X = self.CB[Y]
-		X = self.X - X
+		return self.X - self.C[X]
 
-		return X
-
-class HNGE():
+class HNGE:
 
 	def __init__(self, n=10):
 
-		self.CB                     = -np.ones((n, n), dtype='float32')
-		self.CB[np.diag_indices(n)] = 1
+		self.C = np.zeros((n, n), dtype='float32') - 1
+		self.C[np.diag_indices(n)] = 1
 
 	def forward(self, X, mode=''):
 
-		Y = np.argmax(X, 1)
-
 		if 'G' in mode: self.X = X
 
-		return Y
+		return np.argmax(X, 1)
 
-	def backward(self, Y, mode=''):
+	def backward(self, X, mode=''):
 
-		X = self.CB[Y]
-		X = (self.X * X < 1) * X
-
-		return X
+		return (self.X * self.C[X] < 1) * -self.C[X]
 
