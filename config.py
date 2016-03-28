@@ -10,8 +10,8 @@ parser.add_argument('-epoch'    , type=int  , default=10 )
 parser.add_argument('-batchsize', type=int  , default=100)
 parser.add_argument('-aug'      , type=float, default=0.0)
 
-parser.add_argument('-lrnalg'  ,             default='sgd'                       )
-parser.add_argument('-lrnparam', type=float, default=[0,1e-3,1e-3,0.9], nargs='*')
+parser.add_argument('-lrnalg'  ,             default='sgd'        )
+parser.add_argument('-lrnparam', type=float, default=[], nargs='*')
 
 parser.add_argument('-trnerr', action='store_true')
 parser.add_argument('-quiet' , action='store_true')

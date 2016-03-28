@@ -15,6 +15,7 @@ def main(mainarg):
 	## Load Settings
 
 	settings = parser.parse_args(mainarg); np.random.seed(settings.seed)
+	settings.lrnparam = [0] + settings.lrnparam
 
 	## Load Dataset
 
@@ -30,19 +31,12 @@ def main(mainarg):
 		if len(settings.fast) < 3: XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[0]]; Xt = Xt[:settings.fast[0]]
 		else                     : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]] 
 
+	datasize = sum(subset.nbytes for subset in [XT,YT,Xv,Yv,Xt,Yt]) / 1024.0**2
+
 	## Load Network
 
 	net      = NET(spec2hp(settings.network), NC)
 	net.mode = settings.mode
-
-	## Check Memory Usage
-
-	usage  = net.size(np.zeros_like(XT[:settings.batchsize]))
-	usage += sum(subset.nbytes for subset in [XT,YT,Xv,Yv,Xt,Yt])
-	usage /= 1024.0**2
-
-	if usage > settings.limit > 0: raise MemoryError(usage)
-	else                         : print('Memory Usage ~ %.2f MB' % usage)
 
 	## Define Epoch
 
@@ -62,15 +56,18 @@ def main(mainarg):
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
 				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
+				mem = net.size() + datasize
+				if mem > settings.limit > 0: raise MemoryError(mem)
+
 				if settings.quiet: continue
 
 				toc = time.time()
 				rem = (toc - tic) * (X.shape[0] - prg) / prg
 				rem = str(datetime.timedelta(seconds=int(rem)))
 
-				msg  = 'p(Error) = %.2e '       % (err / float(prg))
-				msg += '& |W|/|G| = %.2e/%.2e ' % (rep['W'], rep['G']) if rep is not None else ''
-				msg += '[%.2f%% | %s left]'     % (100.0 * prg / X.shape[0], rem)
+				msg  = 'p(Error) = %.2e '            % (err / float(prg))
+				msg += '& |W|/|dW| = %.2e/%.2e '     % (rep['W'], rep['G']) if rep is not None else ''
+				msg += '[%.2fMB | %.2f%% | %s left]' % (mem, 100.0 * prg / X.shape[0], rem)
 
 				print(msg, end='\r'); #sys.stdout.flush()
 

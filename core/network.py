@@ -4,7 +4,7 @@ import os
 from scipy.io import savemat, loadmat
 
 from core.layers import CONV, MXPL, RELU, PADD, FLAT, FLCN, SFMX, HNGE
-from core.optimizers import SGD, ASGD, ADAM
+from core.optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
 class NET:
 
@@ -82,16 +82,10 @@ class NET:
 
 		return self
 
-	def update(self, method='SGD', param=[0,1e-3,1e-3,0.9]):
+	def update(self, method='', param=[]):
 
-		method = method.upper()
-
-		if   method == 'SGD' : optimize = SGD
-		elif method == 'ASGD': optimize = ASGD
-		elif method == 'ADAM': optimize = ADAM
-		else                 : raise NameError(method)
-
-		report = {'W':[], 'G':[]}
+		optimize = eval(method.upper())
+		report   = {'W':[], 'G':[]}
 
 		for L in self.layer[self.A]:
 
@@ -110,6 +104,7 @@ class NET:
 		return report
 
 	def reset(self): pass # G, etc.
+	def load(self): pass
 
 	def save(self, fn):
 
@@ -118,18 +113,16 @@ class NET:
 		if os.path.isfile(fn): Ws = loadmat(fn)['Ws']
 		else                 : Ws = np.zeros(0, dtype=np.object)
 
-		for W in [L.W for L in self.layer[self.R] if L.__class__.__name__ == 'CONV']:
+		for L in self.layer[self.R]:
+
+			if L.__class__.__name__ != 'CONV': continue
 
 			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
-			Ws[-1] = W
+			Ws[-1] = L.W if not hasattr(L,'A') else L.A
 
 		savemat(fn, {'Ws':Ws}, appendmat=False)
 
-	def size(self, batch):
+	def size(self):
 
-		self.forward (batch)
-		self.backward(np.zeros(batch.shape[0], dtype='uint8'))
-		#self.update
-
-		return sum([getattr(L, P).nbytes for L in self.layer[self.A] for P in dir(L) if hasattr(getattr(L, P), 'nbytes')])
+		return sum([getattr(L, P).nbytes for L in self.layer[self.A] for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
 
