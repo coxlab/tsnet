@@ -56,7 +56,7 @@ def main(mainarg):
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
 				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
-				mem = net.size() + datasize
+				mem = int(net.size() + datasize + 0.5)
 				if mem > settings.limit > 0: raise MemoryError(mem)
 
 				if settings.quiet: continue
@@ -65,9 +65,9 @@ def main(mainarg):
 				rem = (toc - tic) * (X.shape[0] - prg) / prg
 				rem = str(datetime.timedelta(seconds=int(rem)))
 
-				msg  = 'p(Error) = %.2e '            % (err / float(prg))
-				msg += '& |W|/|dW| = %.2e/%.2e '     % (rep['W'], rep['G']) if rep is not None else ''
-				msg += '[%.2fMB | %.2f%% | %s left]' % (mem, 100.0 * prg / X.shape[0], rem)
+				msg  = 'p(Error) = %.2e '           % (err / float(prg))
+				msg += '& |W|/|dW| = %.2e/%.2e '    % (rep['W'], rep['G']) if rep is not None else ''
+				msg += '[%d MB | %.2f%% | %s left]' % (mem, 100.0 * prg / X.shape[0], rem)
 
 				print(msg, end='\r'); #sys.stdout.flush()
 

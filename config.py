@@ -5,23 +5,31 @@ import argparse; parser = argparse.ArgumentParser()
 parser.add_argument('-dataset', default='mnist'                )
 parser.add_argument('-network', default=['mnist_1l'], nargs='*')
 
-parser.add_argument('-mode'     , type=int  , default=1  )
-parser.add_argument('-epoch'    , type=int  , default=10 )
-parser.add_argument('-batchsize', type=int  , default=100)
-parser.add_argument('-aug'      , type=float, default=0.0)
+## (Network Related)
 
+parser.add_argument('-mode'    , type=int  , default=1            )
 parser.add_argument('-lrnalg'  ,             default='sgd'        )
-parser.add_argument('-lrnparam', type=float, default=[], nargs='*')
+parser.add_argument('-lrnparam', type=float, default=[], nargs='*') # see core/optimizers.py
+
+parser.add_argument('-load', default='')
+parser.add_argument('-save', default='')
+
+## (Dataset Related)
+
+parser.add_argument('-epoch'    , type=int  , default=10           )
+parser.add_argument('-batchsize', type=int  , default=100          )
+parser.add_argument('-aug'      , type=float, default=0.0          )
+parser.add_argument('-fast'     , type=int  , default=[], nargs='*')
+
+## (Misc)
 
 parser.add_argument('-trnerr', action='store_true')
 parser.add_argument('-quiet' , action='store_true')
 
-parser.add_argument('-seed' , type=int, default=0            )
-parser.add_argument('-save' ,           default=''           )
-parser.add_argument('-fast' , type=int, default=[], nargs='*')
-parser.add_argument('-limit', type=int, default=0            )
+parser.add_argument('-seed' , type=int, default=0)
+parser.add_argument('-limit', type=int, default=0)
 
-## Example Hyperparameter
+## Example Hyperparameters
 
 #mnist_1l   = ['conv:100,0,7,7', 'mxpl:7,7/4,4'] #+ ['relu']
 #cifar10_1l = ['conv:100,0,9,9', 'mxpl:9,9/5,5'] #+ ['relu']

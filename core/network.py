@@ -91,10 +91,8 @@ class NET:
 
 			if not hasattr(L, 'G'): continue
 
-			optimize(L, *param)
-
+			report['G'] += [np.linalg.norm(L.G)]; optimize(L, *param)
 			report['W'] += [np.linalg.norm(L.W)]
-			report['G'] += [np.linalg.norm(L.G)]
 
 		param[0] += 1 # time
 
@@ -102,9 +100,6 @@ class NET:
 		report['G'] = np.linalg.norm(report['G'])
 
 		return report
-
-	def reset(self): pass # G, etc.
-	def load(self): pass
 
 	def save(self, fn):
 
@@ -121,6 +116,10 @@ class NET:
 			Ws[-1] = L.W if not hasattr(L,'A') else L.A
 
 		savemat(fn, {'Ws':Ws}, appendmat=False)
+
+	def load(self, fn):
+
+		if not fn: return
 
 	def size(self):
 
