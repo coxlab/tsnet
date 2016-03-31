@@ -37,6 +37,7 @@ def main(mainarg):
 
 	net      = NET(spec2hp(settings.network), NC)
 	net.mode = settings.mode
+	net.load ( settings.load )
 
 	## Define Epoch
 
@@ -74,8 +75,6 @@ def main(mainarg):
 		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
 
 		return err
-
-	net.save(settings.save)
 
 	val = bval = float('inf')
 	tst = btst = float('inf')

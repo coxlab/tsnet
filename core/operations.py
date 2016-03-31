@@ -27,7 +27,8 @@ def expand(T, w):
 
 def collapse(T, W, divisive=False):
 
-	if divisive: W = np.clip(np.reciprocal(W), -1e6, 1e6) / np.prod(W.shape[1:])
+	if divisive: W = W / np.sum(np.square(W.reshape(W.shape[0], -1)), 1)[:,None,None,None]
+	#if divisive: W = np.clip(np.reciprocal(W), -1e6, 1e6) / np.prod(W.shape[1:])
 
 	if T.shape[-6] == W.shape[0]: # Z ONLY (after 2nd-stage expansion)
 

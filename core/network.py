@@ -1,7 +1,7 @@
 import numpy as np
 
 import os
-from scipy.io import savemat, loadmat
+from scipy.io import savemat, loadmat; REPRONLY = True
 
 from core.layers import CONV, MXPL, RELU, PADD, FLAT, FLCN, SFMX, HNGE
 from core.optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
@@ -23,7 +23,7 @@ class NET:
 
 		self.layer += [FLAT(  )]
 		self.layer += [FLCN(nc)]
-		self.layer += [HNGE(nc)]
+		self.layer += [SFMX(nc)]
 
 		self.A, self.AR = slice(None    ), slice(None, None, -1) # all layers
 		self.R, self.RR = slice(None, -3), slice(-4  , None, -1) # feature layers
@@ -108,18 +108,26 @@ class NET:
 		if os.path.isfile(fn): Ws = loadmat(fn)['Ws']
 		else                 : Ws = np.zeros(0, dtype=np.object)
 
-		for L in self.layer[self.R]:
+		for L in self.layer[self.R if REPRONLY else self.A]:
 
-			if L.__class__.__name__ != 'CONV': continue
+			if not hasattr(L, 'W'): continue
 
 			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
-			Ws[-1] = L.W if not hasattr(L,'A') else L.A
+			Ws[-1] = L.W if not hasattr(L, 'A') else L.A
 
 		savemat(fn, {'Ws':Ws}, appendmat=False)
 
 	def load(self, fn):
 
 		if not fn: return
+
+		Ws = loadmat(fn)['Ws'].ravel()
+
+		for L in self.layer[self.RR if REPRONLY else self.AR]:
+
+			if not hasattr(L, 'W'): continue
+
+			L.W = Ws[-1]; Ws = Ws[:-1]
 
 	def size(self):
 
