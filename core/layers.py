@@ -14,7 +14,7 @@ def randfilt(filt, w):
 
 	if filt is not None  : return filt
 	elif       not all(w): return None
-	else: return np.random.randn(*w).astype('float32') / np.single(100.0) #* np.sqrt(2.0 / np.prod(np.array(w)[1:])).astype('float32')
+	else: return np.random.randn(*w).astype('float32') * np.sqrt(2.0 / np.prod(np.array(w)[1:])).astype('float32')
 
 def zerofilt(filt, w):
 

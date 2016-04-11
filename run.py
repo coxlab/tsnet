@@ -5,6 +5,7 @@ import warnings; warnings.filterwarnings('ignore')
 import numpy as np
 
 from config import parser, spec2hp
+from datasets.loader import load
 from core.network import NET
 
 def main(mainarg):
@@ -19,8 +20,7 @@ def main(mainarg):
 
 	## Load Dataset
 
-	if   settings.dataset == 'mnist'  : from datasets.mnist   import XT, YT, Xv, Yv, Xt, Yt, NC, prp, aug as taug
-	elif settings.dataset == 'cifar10': from datasets.cifar10 import XT, YT, Xv, Yv, Xt, Yt, NC, prp, aug as taug
+	XT, YT, Xv, Yv, Xt, Yt, NC, prp, taug = load(settings.dataset)
 
 	if settings.aug == 0: aug = None
 	else                : aug = lambda X: taug(X, settings.aug)

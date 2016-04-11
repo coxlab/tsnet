@@ -42,7 +42,7 @@ mnist_3l = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2']
 
 def spec2hp(nspec):
 
-	if ':' not in ''.join(nspec): exec 'nspec = %s' % nspec[0]
+	if ':' not in ''.join(nspec): nspec = eval(nspec[0])
 
 	hp = []
 
