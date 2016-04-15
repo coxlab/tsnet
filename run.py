@@ -1,7 +1,9 @@
 from __future__ import print_function
+from blessings import Terminal; term = Terminal()
 
-import sys, time, datetime
+import sys, time
 import warnings; warnings.filterwarnings('ignore')
+
 import numpy as np
 
 from config import parser, spec2hp
@@ -10,13 +12,18 @@ from core.network import NET
 
 def main(mainarg):
 
-	print('-' * 55 + ' ' + time.ctime())
-	print('Initializing')
-
 	## Load Settings
 
 	settings = parser.parse_args(mainarg); np.random.seed(settings.seed)
 	settings.lrnparam = [0] + settings.lrnparam
+
+	tw, th = (term.width, term.height) if not settings.quiet else (80, 24)
+	cw, cn = (6, tw / 6)
+	lx, ly = (0, 0)
+
+	def lprint(msg, lx=0, ly=th-1):
+		if not settings.quiet:
+			with term.location(lx, ly): print(msg, end='')
 
 	## Load Dataset
 
@@ -41,14 +48,11 @@ def main(mainarg):
 
 	## Define Epoch
 
-	def process(X, Y, trn=True, aug=None):
-
-		err = prg = 0
-		tic = time.time()
+	def process(X, Y, trn=True, aug=None, err=0):
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
 
-				Xb = X[i:i+settings.batchsize]; prg += Xb.shape[0]
+				Xb = X[i:i+settings.batchsize]
 				Yb = Y[i:i+settings.batchsize]
 
 				Xb = aug(Xb) if aug is not None else Xb
@@ -60,51 +64,35 @@ def main(mainarg):
 				mem = int(net.size() + datasize + 0.5)
 				if mem > settings.limit > 0: raise MemoryError(mem)
 
-				if settings.quiet: continue
-
-				toc = time.time()
-				rem = (toc - tic) * (X.shape[0] - prg) / prg
-				rem = str(datetime.timedelta(seconds=int(rem)))
-
-				msg  = 'p(Error) = %.2e '           % (err / float(prg))
-				msg += '& |W|/|dW| = %.2e/%.2e '    % (rep['W'], rep['G']) if rep is not None else ''
-				msg += '[%d MB | %.2f%% | %s left]' % (mem, 100.0 * prg / X.shape[0], rem)
-
-				print(msg, end='\r'); #sys.stdout.flush()
-
-		if not settings.quiet: sys.stdout.write("\033[K") # clear line (may not be safe)
+				lprint(' %d' % err, lx, ly)
 
 		return err
 
-	val = bval = float('inf')
-	tst = btst = float('inf')
-
-	print('-' * 55 + ' ' + time.ctime())
-
 	## Start
+
+	trnerr, valerr, tsterr = ([] for i in xrange(3))
 
 	for n in xrange(settings.epoch):
 
-		print('Epoch %d/%d' % (n+1, settings.epoch))
+		if (n % cn) == 0: lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n'*4)
 
 		XT, YT = shuffle(XT, YT)
 
-		print(                                                      'TRN Error ~ %d' % process(XT, YT, aug=aug))
-		if settings.trnerr:                                   print('TRN Error = %d' % process(XT, YT, trn=False))
-		if Xv.shape[0] > 0: val = process(Xv, Yv, trn=False); print('VAL Error = %d' % val)
-		if Xt.shape[0] > 0: tst = process(Xt, Yt, trn=False); print('TST Error = %d' % tst)
-
-		if val < bval: bval = val
-		if tst < btst: btst = tst
+		lx = (n % cn) * cw
+		ly = th-4; trnerr += [process(XT, YT, aug=aug)  ]
+		ly = th-3; valerr += [process(Xv, Yv, trn=False)]
+		ly = th-2; tsterr += [process(Xt, Yt, trn=False)]
 
 		net.save(settings.save)
 
-		print('-' * 55 + ' ' + time.ctime())
+	lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
 
 	## Return
 
-	return val, bval, tst, btst
+	if settings.quiet: return trnerr, valerr, tsterr
+	else             : return ''
 
 ## Run
 
-if __name__ == '__main__': main(sys.argv[1:])
+if __name__ == '__main__': print(main(sys.argv[1:]), end='')
+
