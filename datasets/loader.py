@@ -4,15 +4,15 @@ import numpy as np
 dsdir  = os.path.dirname(__file__)
 dsdir += '/' if dsdir else ''
 
-mnist        = [10, 10000, 'mnist_train', 'mnist_test']
-mnist_rn     = [10, 10000, 'mnist_background_random_train', 'mnist_background_random_test']
-mnist_im     = [10, 10000, 'mnist_background_images_train', 'mnist_background_images_test']
-mnist_rot    = [10, 10000, 'mnist_all_rotation_normalized_float_train', 'mnist_all_rotation_normalized_float_test']
-mnist_rot_im = [10, 10000, 'mnist_all_background_images_rotation_normalized_train', 'mnist_all_background_images_rotation_normalized_test']
-mnist_dot    = [10, 10000, 'mnist_dots_train', 'mnist_dots_test']
-rect         = [ 2,  1000, 'rectangles_train', 'rectangles_test']
-rect_im      = [ 2, 10000, 'rectangles_im_train', 'rectangles_im_test']
-convex       = [ 2,  6000, 'convex_train', 'convex_test']
+mnist         = [10, 10000, 'mnist_train', 'mnist_test']
+mnist_img     = [10, 10000, 'mnist_background_images_train', 'mnist_background_images_test']
+mnist_rot     = [10, 10000, 'mnist_all_rotation_normalized_float_train', 'mnist_all_rotation_normalized_float_test']
+mnist_rot_img = [10, 10000, 'mnist_all_background_images_rotation_normalized_train', 'mnist_all_background_images_rotation_normalized_test']
+#mnist_rn     = [10, 10000, 'mnist_background_random_train', 'mnist_background_random_test']
+#mnist_dot    = [10, 10000, 'mnist_dots_train', 'mnist_dots_test']
+#rect         = [ 2,  1000, 'rectangles_train', 'rectangles_test']
+#rect_im      = [ 2, 10000, 'rectangles_im_train', 'rectangles_im_test']
+#convex       = [ 2,  6000, 'convex_train', 'convex_test']
 
 def load(name='mnist'):
 

@@ -1,7 +1,7 @@
 from __future__ import print_function
 from blessings import Terminal; term = Terminal()
 
-import sys, time
+import sys, time, datetime
 import warnings; warnings.filterwarnings('ignore')
 
 import numpy as np
@@ -48,7 +48,10 @@ def main(mainarg):
 
 	## Define Epoch
 
-	def process(X, Y, trn=True, aug=None, err=0):
+	def process(X, Y, trn=True, aug=None):
+
+		err = prg = 0
+		tic = time.time()
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
 
@@ -58,6 +61,7 @@ def main(mainarg):
 				Xb = aug(Xb) if aug is not None else Xb
 				Xb = prp(Xb)
 
+				prg += Xb.shape[0] / float(X.shape[0])
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
 				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
@@ -65,6 +69,11 @@ def main(mainarg):
 				if mem > settings.limit > 0: raise MemoryError(mem)
 
 				lprint(' %d' % err, lx, ly)
+
+				rem = (time.time() - tic) * (1.0 - prg) / prg
+				rem = str(datetime.timedelta(seconds=int(rem)))
+
+				lprint('[%6.2f%% | %s left]' % (prg * 100, rem))
 
 		return err
 
