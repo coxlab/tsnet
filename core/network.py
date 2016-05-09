@@ -8,7 +8,7 @@ from core.optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
 class NET:
 
-	def __init__(self, hp, nc=10):
+	def __init__(self, hp, loss, nc):
 
 		self.layer = []
 
@@ -23,11 +23,11 @@ class NET:
 
 		self.layer += [FLAT(  )]
 		self.layer += [FLCN(nc)]
-		self.layer += [SFMX(nc)]
+		self.layer += [SFMX(nc)] if loss == 0 else [HNGE(nc)]
 
 		self.A, self.AR = slice(None    ), slice(None, None, -1) # all layers
-		self.R, self.RR = slice(None, -3), slice(-4  , None, -1) # feature layers
-		self.L, self.LR = slice(-3, None), slice(None, -4  , -1) # classifier layers
+		self.R, self.RR = slice(None, -3), slice(-4  , None, -1) # repr layers
+		self.L, self.LR = slice(-3, None), slice(None, -4  , -1) # loss layers
 
 	def forward(self, X, training=True):
 
@@ -37,18 +37,10 @@ class NET:
 
 			for L in self.layer[self.A]: X = L.forward(X, mode=auto('X'))
 
-			#Z = X
-			#for L in self.layer[self.R]: X, Z = L.forward(X, mode='X'), L.forward   (Z, mode=     'Z' )
-			#for L in self.layer[self.R]:    Z =                         L.subforward(Z, mode=auto('Z'))
-
-			#X = Z
-			#for L in self.layer[self.L]: X = L.forward(X, mode=auto('X'))
-
-		elif self.mode > 0: # subspace
+		elif self.mode > 0: # tensor
 
 			Z = X
-			for L in self.layer[self.R]: X, Z = L.forward(X, mode=auto('X')), L.forward(Z, mode='Z')
-			#for L in self.layer[self.R]: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
+			for L in self.layer[self.R]: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
 
 			X = Z
 			for L in self.layer[self.L]: X = L.forward(X, mode=auto('X'))
@@ -67,10 +59,7 @@ class NET:
 
 			for L in self.layer[self.AR]: Y = L.backward(Y, mode='XG')
 
-			#for L in self.layer[self.LR]: Y = L.backward   (Y, mode='XG')
-			#for L in self.layer[self.RR]: Y = L.subbackward(Y, mode='ZG')
-
-		elif self.mode > 0: # subspace
+		elif self.mode > 0: # tensor
 
 			for L in self.layer[self.LR]: Y = L.backward(Y, mode='XG')
 
@@ -113,7 +102,7 @@ class NET:
 			if not hasattr(L, 'W'): continue
 
 			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
-			Ws[-1] = L.W if not hasattr(L, 'A') else L.A
+			Ws[-1] = self.extract(L)
 
 		savemat(fn, {'Ws':Ws}, appendmat=False)
 
@@ -133,3 +122,15 @@ class NET:
 
 		return sum([getattr(L, P).nbytes for L in self.layer[self.A] for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
 
+	def extract(self, obj):
+
+		if obj.__class__.__name__ == 'CONV': return obj.W
+
+		else:
+			if self.mode == 0: return obj.W
+
+			W = self.layer[-3].backward(obj.W.T)
+			for L in self.layer[self.R]: W = L.subforward(W, mode='Z')
+			W = self.layer[-3].forward(W).T
+
+			return W

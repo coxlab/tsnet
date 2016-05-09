@@ -35,14 +35,14 @@ def main(mainarg):
 	def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
 	if settings.fast:
-		if len(settings.fast) < 3: XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[0]]; Xt = Xt[:settings.fast[0]]
-		else                     : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]] 
+		if len(settings.fast) != 3: Xt = Xt[:settings.fast[0]]
+		else                      : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]]
 
 	datasize = sum(subset.nbytes for subset in [XT,YT,Xv,Yv,Xt,Yt]) / 1024.0**2
 
 	## Load Network
 
-	net      = NET(spec2hp(settings.network), NC)
+	net      = NET(spec2hp(settings.network), settings.loss, NC)
 	net.mode = settings.mode
 	net.load ( settings.load )
 

@@ -55,7 +55,7 @@ class CONV(BASE):
 
 		if 'X' in mode and 'G' in mode: self.X = T
 
-		T = collapse(T, self.W if 'G' in mode or not hasattr(self, 'A') else self.A) if 'X' in mode else T
+		T = collapse(T, self.W) if 'X' in mode else T
 
 		return T
 
@@ -210,7 +210,7 @@ class FLCN:
 
 		if 'G' in mode: self.X = X
 
-		return np.dot(X, self.W if 'G' in mode or not hasattr(self, 'A') else self.A)
+		return np.dot(X, self.W)
 
 	def backward(self, X, mode=''):
 
