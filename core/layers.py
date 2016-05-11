@@ -2,7 +2,12 @@ import numpy as np
 import numexpr as ne
 from numpy.lib.stride_tricks import as_strided
 
+from scipy.linalg.blas import ssyrk
+from scipy.linalg.lapack import sposv
+
 from core.operations import expand, collapse, uncollapse, unexpand
+
+def neadd(Y, X): ne.evaluate('Y + X', out=Y)
 
 def indices(shape): # memory efficient np.indices
 
@@ -30,6 +35,17 @@ class BASE:
 	def backward   (self, T, mode=''): return T
 	def subforward (self, T, mode=''): return T
 	def subbackward(self, T, mode=''): return T
+
+	def reset(self):
+
+		if hasattr(self, 'G'): del self.G
+
+	def accumulate(self, G):
+
+		if hasattr(self, 'G'): neadd(self.G, G)
+		else                 : self.G = G
+
+	def solve(self): pass
 
 class CONV(BASE):
 
@@ -63,10 +79,10 @@ class CONV(BASE):
 
 		if 'X' in mode and 'G' in mode:
 
-			D       = T
-			X       = np.squeeze  (self.X, 1)
-			self.G  = np.tensordot(D, X, ([0,2,3],[0,1,2]))
-			self.G /= D.shape[0]
+			D = T
+			X = np.squeeze  (self.X, 1)
+			G = np.tensordot(D, X, ([0,2,3],[0,1,2]))
+			self.accumulate(G)
 
 		if 'X' in mode: T = uncollapse(T, self.W)
 		else          : T = np.sum(T, 1)[:,None]
@@ -88,12 +104,12 @@ class CONV(BASE):
 
 		if 'G' in mode:
 
-			D       = np.reshape (T, T.shape + (1,)*3)
-			Z       = self.Z
-			self.G  = ne.evaluate('D*Z')
-			self.G  = np.reshape (self.G, (-1,) + self.G.shape[-6:])
-			self.G  = np.sum     (self.G, (0,2,3))
-			self.G /= D.shape[0]
+			D = np.reshape (T, T.shape + (1,)*3)
+			Z = self.Z
+			G = ne.evaluate('D*Z')
+			G = np.reshape (G, (-1,) + G.shape[-6:])
+			G = np.sum     (G, (0,2,3))
+			self.accumulate(G)
 
 		return uncollapse(T, self.W, keepdims=True)
 
@@ -179,7 +195,7 @@ class PADD(BASE):
 
 ## Loss Layers
 
-class FLAT:
+class FLAT(BASE):
 
 	def __init__(self, sh=None):
 
@@ -193,9 +209,9 @@ class FLAT:
 
 	def backward(self, T, mode=''):
 
-		return T.reshape(T.shape[0], *self.sh[1:])
+		return T.reshape(T.shape[0], *self.sh[1:]) if T is not None else None
 
-class FLCN:
+class FLCN(BASE):
 
 	def __init__(self, n=10, l=None):
 
@@ -210,18 +226,18 @@ class FLCN:
 
 		if 'G' in mode: self.X = X
 
-		return np.dot(X, self.W)
+		return np.dot(X, self.W if 'G' in mode or not hasattr(self, 'A') else self.A)
 
 	def backward(self, X, mode=''):
 
 		if 'G' in mode:
 
-			self.G  = np.dot(self.X.T, X, out=self.G if hasattr(self, 'G') else None)
-			self.G /= X.shape[0]
+			G = np.dot(self.X.T, X)
+			self.accumulate(G)
 
 		return np.dot(X, self.W.T)
 
-class SFMX:
+class SFMX(BASE):
 
 	def __init__(self, n=10):
 
@@ -230,9 +246,9 @@ class SFMX:
 
 	def forward(self, X, mode=''):
 
-		X -= np.amax  (X, 1)[:,None]
-		X  = np.exp   (X   )
-		X /= np.sum   (X, 1)[:,None]
+		X -= np.amax(X, 1)[:,None]
+		X  = np.exp (X   )
+		X /= np.sum (X, 1)[:,None]
 
 		if 'G' in mode: self.X = X
 
@@ -242,7 +258,7 @@ class SFMX:
 
 		return self.X - self.C[X]
 
-class HNGE:
+class HNGE(BASE):
 
 	def __init__(self, n=10):
 
@@ -259,3 +275,64 @@ class HNGE:
 
 		return (self.X * self.C[X] < 1) * -self.C[X]
 
+class RDGE(BASE):
+
+	def __init__(self, n=10, l=None):
+
+		self.n = n
+		self.l = l
+
+		self.W = randfilt(self.W if hasattr(self, 'W') else None, (self.l, self.n))
+
+		self.C = np.zeros((n, n), dtype='float32') - 1
+		self.C[np.diag_indices(n)] = 1
+
+		self.SII = None
+		self.SIO = None
+
+	def forward(self, X, mode=''):
+
+		if self.l is None: self.__init__(n=self.n, l=X.shape[1])
+
+		Y = np.dot(X, self.W)
+
+		if 'G' in mode:
+
+			self.X = X
+			self.Y = Y
+
+			if self.SII is None: self.SII = np.zeros((self.X.shape[1],)*2, dtype='float32', order='F')
+			ssyrk(alpha=1.0, a=self.X, trans=1, beta=1.0, c=self.SII, overwrite_c=1)
+
+		return np.argmax(Y, 1)
+
+	def backward(self, X, mode=''):
+
+		D = (self.Y - self.C[X]) * 2
+
+		if 'G' in mode:
+
+			if self.SIO is None: self.SIO  = np.dot(self.X.T, self.C[X])
+			else               : self.SIO += np.dot(self.X.T, self.C[X])
+
+			#G = np.dot(self.X.T, D)
+			#self.accumulate(G)
+
+		return np.dot(D, self.W.T)
+
+	def solve(self):
+
+		DI = np.diag_indices_from(self.SII)
+
+		D = self.SII[DI]
+		#for i in xrange(1, self.SII.shape[0]): self.SII[i:,i-1] = self.SII[i-1,i:]
+
+		self.SII[DI] += np.mean(D)
+		_, self.W, _ = sposv(self.SII, self.SIO, overwrite_a=True, overwrite_b=False) #, lower=1)
+
+		#self.SII[DI] = D
+
+	def reset(self):
+
+		if hasattr(self, 'G'): del self.G
+		self.SII = self.SIO = None

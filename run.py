@@ -63,7 +63,7 @@ def main(mainarg):
 
 				prg += Xb.shape[0] / float(X.shape[0])
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
-				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
+				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam, settings.loss==2) if trn else None
 
 				mem = int(net.size() + datasize + 0.5)
 				if mem > settings.limit > 0: raise MemoryError(mem)
@@ -88,10 +88,12 @@ def main(mainarg):
 		XT, YT = shuffle(XT, YT)
 
 		lx = (n % cn) * cw
-		ly = th-4; trnerr += [process(XT, YT, aug=aug)  ]
+		ly = th-4; trnerr += [process(XT, YT, aug=aug)  ]; net.solve()
 		ly = th-3; valerr += [process(Xv, Yv, trn=False)]
 		ly = th-2; tsterr += [process(Xt, Yt, trn=False)]
 
+		#if settings.loss == 2: net.update('sgd', [0, 1e-3, 1e-3, 0])
+		if settings.loss == 2: net.update(settings.lrnalg, settings.lrnparam)
 		net.save(settings.save)
 
 	lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
