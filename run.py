@@ -93,8 +93,9 @@ def main(mainarg):
 		ly = th-2; tsterr += [process(Xt, Yt, trn=False)]
 
 		#if settings.loss == 2: net.update('sgd', [0, 1e-3, 1e-3, 0])
-		if settings.loss == 2: net.update(settings.lrnalg, settings.lrnparam)
-		net.save(settings.save)
+		#if settings.loss == 2: net.update(settings.lrnalg, settings.lrnparam)
+		net.update(settings.lrnalg, settings.lrnparam, settings.loss!=2)
+		net.save  (settings.save)
 
 	lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
 
