@@ -27,14 +27,12 @@ def zerofilt(filt, w):
 	elif       not all(w): return None
 	else: return np.zeros(tuple(w), dtype='float32')
 
-## Representation Layers
-
 class BASE:
 
 	def forward    (self, T, mode=''): return T
 	def backward   (self, T, mode=''): return T
-	def subforward (self, T, mode=''): return T
-	def subbackward(self, T, mode=''): return T
+	def auxforward (self, T, mode=''): return T
+	def auxbackward(self, T, mode=''): return T
 
 	def reset(self):
 
@@ -46,6 +44,8 @@ class BASE:
 		else                 : self.G = G
 
 	def solve(self): pass
+
+## Representation Layers
 
 class CONV(BASE):
 
@@ -94,13 +94,13 @@ class CONV(BASE):
 
 		return O
 
-	def subforward(self, T, mode='Z'):
+	def auxforward(self, T, mode='Z'):
 
 		if 'G' in mode: self.Z = T
 
 		return collapse(T, self.W, divisive='R' in mode)
 
-	def subbackward(self, T, mode='Z'):
+	def auxbackward(self, T, mode='Z'):
 
 		if 'G' in mode:
 
@@ -211,7 +211,7 @@ class FLAT(BASE):
 
 		return T.reshape(T.shape[0], *self.sh[1:]) if T is not None else None
 
-class FLCN(BASE):
+class SFMX(BASE):
 
 	def __init__(self, n=10, l=None):
 
@@ -220,60 +220,34 @@ class FLCN(BASE):
 
 		self.W = zerofilt(self.W if hasattr(self, 'W') else None, (self.l, self.n))
 
+		self.C = np.zeros((n, n), dtype='float32')
+		self.C[np.diag_indices(n)] = 1
+
 	def forward(self, X, mode=''):
 
 		if self.l is None: self.__init__(n=self.n, l=X.shape[1])
 
 		if 'G' in mode: self.X = X
 
-		return np.dot(X, self.W if 'G' in mode or not hasattr(self, 'A') else self.A)
+		Y  = np.dot (X, self.W)
+		Y -= np.amax(Y, 1     )[:,None]
+		Y  = np.exp (Y        )
+		Y /= np.sum (Y, 1     )[:,None]
 
-	def backward(self, X, mode=''):
+		if 'G' in mode: self.Y = Y
+
+		return np.argmax(Y, 1)
+
+	def backward(self, Y, mode=''):
+
+		D = self.Y - self.C[Y]
 
 		if 'G' in mode:
 
-			G = np.dot(self.X.T, X)
+			G = np.dot(self.X.T, D)
 			self.accumulate(G)
 
-		return np.dot(X, self.W.T)
-
-class SFMX(BASE):
-
-	def __init__(self, n=10):
-
-		self.C = np.zeros((n, n), dtype='float32')
-		self.C[np.diag_indices(n)] = 1
-
-	def forward(self, X, mode=''):
-
-		X -= np.amax(X, 1)[:,None]
-		X  = np.exp (X   )
-		X /= np.sum (X, 1)[:,None]
-
-		if 'G' in mode: self.X = X
-
-		return np.argmax(X, 1)
-
-	def backward(self, X, mode=''):
-
-		return self.X - self.C[X]
-
-class HNGE(BASE):
-
-	def __init__(self, n=10):
-
-		self.C = np.zeros((n, n), dtype='float32') - 1
-		self.C[np.diag_indices(n)] = 1
-
-	def forward(self, X, mode=''):
-
-		if 'G' in mode: self.X = X
-
-		return np.argmax(X, 1)
-
-	def backward(self, X, mode=''):
-
-		return (self.X * self.C[X] < 1) * -self.C[X]
+		return np.dot(D, self.W.T)
 
 class RDGE(BASE):
 
@@ -299,26 +273,26 @@ class RDGE(BASE):
 		if 'G' in mode:
 
 			self.X = X
-			self.Y = Y
+			#self.Y = Y
 
 			if self.SII is None: self.SII = np.zeros((self.X.shape[1],)*2, dtype='float32', order='F')
 			ssyrk(alpha=1.0, a=self.X, trans=1, beta=1.0, c=self.SII, overwrite_c=1)
 
 		return np.argmax(Y, 1)
 
-	def backward(self, X, mode=''):
+	def backward(self, Y, mode=''):
 
-		D = (self.Y - self.C[X]) * 2
+		#D = (self.Y - self.C[Y]) * 2
 
 		if 'G' in mode:
 
-			if self.SIO is None: self.SIO  = np.dot(self.X.T, self.C[X])
-			else               : self.SIO += np.dot(self.X.T, self.C[X])
+			if self.SIO is None: self.SIO  = np.dot(self.X.T, self.C[Y])
+			else               : self.SIO += np.dot(self.X.T, self.C[Y])
 
 			#G = np.dot(self.X.T, D)
 			#self.accumulate(G)
 
-		return np.dot(D, self.W.T)
+		return None #np.dot(D, self.W.T)
 
 	def solve(self):
 

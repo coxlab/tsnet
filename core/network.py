@@ -3,32 +3,15 @@ import numpy as np
 import os
 from scipy.io import savemat, loadmat; REPRONLY = True
 
-from core.layers import CONV, MXPL, RELU, PADD, FLAT, FLCN, SFMX, HNGE, RDGE
-from core.optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
+from core.layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
+from core.optimizers import SGD #, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
-class NET:
+class BLOCK:
 
-	def __init__(self, hp, loss, nc):
+	def __init__(self, mode):
 
-		self.gc    = 0
-		self.layer = []
-
-		for l in xrange(len(hp)):
-
-			if   hp[l][0] == 'CONV': self.layer += [CONV(*hp[l][1:])]
-			elif hp[l][0] == 'MXPL': self.layer += [MXPL(*hp[l][1:])]
-			elif hp[l][0] == 'RELU': self.layer += [RELU(          )]
-			elif hp[l][0] == 'PADD': self.layer += [PADD(*hp[l][1:])]
-
-			else: raise NameError(hp[l][0])
-
-		if   loss == 0: self.layer += [FLAT(), FLCN(nc), SFMX(nc)]; ll = 3
-		elif loss == 1: self.layer += [FLAT(), FLCN(nc), HNGE(nc)]; ll = 3
-		elif loss == 2: self.layer += [FLAT(), RDGE(nc)          ]; ll = 2
-
-		self.A, self.AR = slice(None     ), slice(None , None , -1) # all  layers
-		self.R, self.RR = slice(None, -ll), slice(-ll-1, None , -1) # repr layers
-		self.L, self.LR = slice(-ll, None), slice(None , -ll-1, -1) # loss layers
+		self.mode   = mode
+		self.layers = []
 
 	def forward(self, X, training=True):
 
@@ -36,41 +19,69 @@ class NET:
 
 		if self.mode == 0: # scalar
 
-			for L in self.layer[self.A]: X = L.forward(X, mode=auto('X'))
+			for L in self.layers: X = L.forward(X, mode=auto('X'))
 
-		elif self.mode > 0: # tensor
+		elif self.mode in [1,2]: # tensor
 
 			Z = X
-			for L in self.layer[self.R]: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
+			for L in self.layers: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
 
 			X = Z
-			for L in self.layer[self.L]: X = L.forward(X, mode=auto('X'))
-
-			if training and self.mode != 2:
-
-				for L in self.layer[self.R]: Z = L.subforward(Z, mode=auto('Z'))
+			for L in self.layers: Z = L.auxforward(Z, mode=auto('Z')) if training and self.mode != 2 else Z
 
 		else: raise ValueError(self.mode)
 
 		return X
 
-	def backward(self, Y, training=True):
-
-		self.gc += Y.shape[0]
+	def backward(self, Y, end=False):
 
 		if self.mode == 0: # scalar
 
-			for L in self.layer[self.AR]: Y = L.backward(Y, mode='XG')
+			for L in self.layers[::-1]: Y = L.backward(Y, mode='XG') if Y is not None else Y
 
-		elif self.mode > 0: # tensor
+		elif self.mode in [1,2]: # tensor
 
-			for L in self.layer[self.LR]: Y = L.backward(Y, mode='XG')
+			if self.mode == 1:
 
-			if self.mode != 2:
+				A = Y
+				for L in self.layers: A = L.auxforward(A, mode='ZR'); L.auxbackward(A, mode='ZG')
 
-				for L in self.layer[self.R]: Y = L.subforward(Y, mode='ZR'); L.subbackward(Y, mode='ZG')
+			if not end:
+
+				for L in self.layers[::-1]: Y = L.backward(Y, mode='Z') if Y is not None else Y
 
 		else: raise ValueError(self.mode)
+
+		return Y
+
+class NET:
+
+	def __init__(self, hp):
+
+		self.gc     = 0
+		self.blocks = []
+
+		for l in xrange(len(hp)):
+
+			m = hp[l][1]
+			if not self.blocks or m != self.blocks[-1].mode: self.blocks += [BLOCK(m)]
+
+			L = eval(hp[l][0])
+			self.blocks[-1].layers += [L(*hp[l][2:])]
+
+		self.layers = [L for B in self.blocks for L in B]
+
+	def forward(self, X, training=True):
+
+		for b in xrange(len(self.blocks)): X = self.blocks[b].forward(X, training)
+
+		return X
+
+	def backward(self, Y):
+
+		self.gc += Y.shape[0]
+
+		for b in reversed(xrange(len(self.blocks))): Y = self.blocks[b].backward(Y, b==0)
 
 		return self
 
@@ -81,7 +92,7 @@ class NET:
 		optimize = eval(method.upper())
 		report   = {'W':[], 'G':[]}
 
-		for L in self.layer[self.A]:
+		for L in self.layers:
 
 			if not hasattr(L, 'G'): continue
 
@@ -100,7 +111,7 @@ class NET:
 
 	def solve(self):
 
-		for L in self.layer[self.A]: L.solve()
+		for L in self.layers: L.solve()
 
 	def save(self, fn):
 
@@ -109,12 +120,12 @@ class NET:
 		if os.path.isfile(fn): Ws = loadmat(fn)['Ws']
 		else                 : Ws = np.zeros(0, dtype=np.object)
 
-		for L in self.layer[self.R if REPRONLY else self.A]:
+		for L in self.layers:
 
 			if not hasattr(L, 'W'): continue
 
 			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
-			Ws[-1] = self.extract(L)
+			Ws[-1] = L.W
 
 		savemat(fn, {'Ws':Ws}, appendmat=False)
 
@@ -124,7 +135,7 @@ class NET:
 
 		Ws = loadmat(fn)['Ws'].ravel()
 
-		for L in self.layer[self.RR if REPRONLY else self.AR]:
+		for L in self.layers:
 
 			if not hasattr(L, 'W'): continue
 
@@ -133,21 +144,9 @@ class NET:
 	def reset(self):
 
 		self.gc = 0
-		for L in self.layer[self.A]: L.reset()
+		for L in self.layers: L.reset()
 
 	def size(self):
 
-		return sum([getattr(L, P).nbytes for L in self.layer[self.A] for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
+		return sum([getattr(L, P).nbytes for L in self.layers for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
 
-	def extract(self, obj):
-
-		if obj.__class__.__name__ == 'CONV': return obj.W
-
-		else:
-			if self.mode == 0: return obj.W
-
-			W = self.layer[-3].backward(obj.W.T)
-			for L in self.layer[self.R]: W = L.subforward(W, mode='Z')
-			W = self.layer[-3].forward(W).T
-
-			return W
