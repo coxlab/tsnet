@@ -6,12 +6,13 @@ from scipy.io import savemat, loadmat; REPRONLY = True
 from core.layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
 from core.optimizers import SGD #, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
-class BLOCK:
+class BLK:
 
 	def __init__(self, mode):
 
 		self.mode   = mode
 		self.layers = []
+		self.first  = False
 
 	def forward(self, X, training=True):
 
@@ -33,7 +34,7 @@ class BLOCK:
 
 		return X
 
-	def backward(self, Y, end=False):
+	def backward(self, Y):
 
 		if self.mode == 0: # scalar
 
@@ -46,7 +47,7 @@ class BLOCK:
 				A = Y
 				for L in self.layers: A = L.auxforward(A, mode='ZR'); L.auxbackward(A, mode='ZG')
 
-			if not end:
+			if not self.first:
 
 				for L in self.layers[::-1]: Y = L.backward(Y, mode='Z') if Y is not None else Y
 
@@ -64,16 +65,17 @@ class NET:
 		for l in xrange(len(hp)):
 
 			m = hp[l][1]
-			if not self.blocks or m != self.blocks[-1].mode: self.blocks += [BLOCK(m)]
+			if not self.blocks or m != self.blocks[-1].mode: self.blocks += [BLK(m)]
 
 			L = eval(hp[l][0])
 			self.blocks[-1].layers += [L(*hp[l][2:])]
 
-		self.layers = [L for B in self.blocks for L in B]
+		self.blocks[0].first = True
+		self.layers          = [L for B in self.blocks for L in B.layers]
 
 	def forward(self, X, training=True):
 
-		for b in xrange(len(self.blocks)): X = self.blocks[b].forward(X, training)
+		for B in self.blocks: X = B.forward(X, training)
 
 		return X
 
@@ -81,13 +83,11 @@ class NET:
 
 		self.gc += Y.shape[0]
 
-		for b in reversed(xrange(len(self.blocks))): Y = self.blocks[b].backward(Y, b==0)
+		for B in self.blocks[::-1]: Y = B.backward(Y)
 
 		return self
 
-	def update(self, method='', param=[], dryrun=False):
-
-		if dryrun: return None
+	def update(self, method='', param=[]):
 
 		optimize = eval(method.upper())
 		report   = {'W':[], 'G':[]}

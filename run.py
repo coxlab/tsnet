@@ -29,8 +29,9 @@ def main(mainarg):
 
 	XT, YT, Xv, Yv, Xt, Yt, NC, prp, taug = load(settings.dataset)
 
-	if settings.aug == 0: aug = None
-	else                : aug = lambda X: taug(X, settings.aug)
+	aug = None
+	#if settings.aug == 0: aug = None
+	#else                : aug = lambda X: taug(X, settings.aug)
 
 	def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
@@ -42,9 +43,7 @@ def main(mainarg):
 
 	## Load Network
 
-	net      = NET(spec2hp(settings.network), settings.loss, NC)
-	net.mode = settings.mode
-	net.load ( settings.load )
+	net = NET(spec2hp(settings.network)); net.load(settings.load)
 
 	## Define Epoch
 
@@ -63,7 +62,7 @@ def main(mainarg):
 
 				prg += Xb.shape[0] / float(X.shape[0])
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
-				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam, settings.loss==2) if trn else None
+				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
 				mem = int(net.size() + datasize + 0.5)
 				if mem > settings.limit > 0: raise MemoryError(mem)
@@ -92,10 +91,7 @@ def main(mainarg):
 		ly = th-3; valerr += [process(Xv, Yv, trn=False)]
 		ly = th-2; tsterr += [process(Xt, Yt, trn=False)]
 
-		#if settings.loss == 2: net.update('sgd', [0, 1e-3, 1e-3, 0])
-		#if settings.loss == 2: net.update(settings.lrnalg, settings.lrnparam)
-		net.update(settings.lrnalg, settings.lrnparam, settings.loss!=2)
-		net.save  (settings.save)
+		net.save(settings.save)
 
 	lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
 

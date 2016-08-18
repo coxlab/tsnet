@@ -27,6 +27,8 @@ def zerofilt(filt, w):
 	elif       not all(w): return None
 	else: return np.zeros(tuple(w), dtype='float32')
 
+## Layers
+
 class BASE:
 
 	def forward    (self, T, mode=''): return T
@@ -44,8 +46,6 @@ class BASE:
 		else                 : self.G = G
 
 	def solve(self): pass
-
-## Representation Layers
 
 class CONV(BASE):
 
@@ -193,8 +193,6 @@ class PADD(BASE):
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
-## Loss Layers
-
 class FLAT(BASE):
 
 	def __init__(self, sh=None):
@@ -306,7 +304,7 @@ class RDGE(BASE):
 
 		#self.SII[DI] = D
 
-	def reset(self):
+	#def reset(self):
 
-		if hasattr(self, 'G'): del self.G
-		self.SII = self.SIO = None
+	#	if hasattr(self, 'G'): del self.G
+	#	self.SII = self.SIO = None
