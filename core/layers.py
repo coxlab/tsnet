@@ -17,9 +17,12 @@ def indices(shape): # memory efficient np.indices
 
 def randfilt(filt, w):
 
+	def fi(w): return w[1]*w[2]*w[3] if len(w) == 4 else w[0]
+	def fo(w): return w[0]*w[2]*w[3] if len(w) == 4 else w[1]
+
 	if filt is not None  : return filt
 	elif       not all(w): return None
-	else: return np.random.randn(*w).astype('float32') * np.sqrt(2.0 / np.prod(np.array(w)[1:])).astype('float32')
+	else: s = np.sqrt(6.0/(fi(w)+fo(w))); return np.random.uniform(-s, s, w).astype('float32')
 
 def zerofilt(filt, w):
 
@@ -193,7 +196,9 @@ class PADD(BASE):
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
-class FLAT(BASE):
+class TSRZ(BASE): pass
+
+class VCTZ(BASE):
 
 	def __init__(self, sh=None):
 
@@ -216,7 +221,7 @@ class SFMX(BASE):
 		self.n = n
 		self.l = l
 
-		self.W = zerofilt(self.W if hasattr(self, 'W') else None, (self.l, self.n))
+		self.W = randfilt(self.W if hasattr(self, 'W') else None, (self.l, self.n))
 
 		self.C = np.zeros((n, n), dtype='float32')
 		self.C[np.diag_indices(n)] = 1

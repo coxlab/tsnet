@@ -32,10 +32,10 @@ def load(name='mnist'):
 	Xv = Xv.reshape(Xv.shape[0], 1, 28, 28)
 	Xt = Xt.reshape(Xt.shape[0], 1, 28, 28)
 
-	Xm = np.mean(XT)
+	Xm  = np.mean(XT, 0, keepdims=True)
+	XT -= Xm
+	Xv -= Xm
+	Xt -= Xm
 
-	def prp(X       ): return X - Xm
-	def aug(X, r=1.0): return X + np.random.randn(*X.shape).astype('float32') * r / 256.0
-
-	return XT, YT, Xv, Yv, Xt, Yt, NC, prp, aug
+	return XT, YT, Xv, Yv, Xt, Yt
 

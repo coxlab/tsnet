@@ -1,10 +1,10 @@
 import numpy as np
 
 import os
-from scipy.io import savemat, loadmat; REPRONLY = True
+from scipy.io import savemat, loadmat
 
-from core.layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
-from core.optimizers import SGD #, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
+from core.layers import CONV, MXPL, RELU, PADD, VCTZ, SFMX, RDGE
+from core.optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
 class BLK:
 

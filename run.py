@@ -10,15 +10,15 @@ from config import parser, spec2hp
 from datasets.loader import load
 from core.network import NET
 
-def main(mainarg):
+def main(arg):
 
 	## Load Settings
 
-	settings = parser.parse_args(mainarg); np.random.seed(settings.seed)
+	settings = parser.parse_args(arg); np.random.seed(settings.seed)
 	settings.lrnparam = [0] + settings.lrnparam
 
 	tw, th = (term.width, term.height) if not settings.quiet else (80, 24)
-	cw, cn = (6, tw / 6)
+	cw, cn = (7, tw / 7)
 	lx, ly = (0, 0)
 
 	def lprint(msg, lx=0, ly=th-1):
@@ -27,11 +27,7 @@ def main(mainarg):
 
 	## Load Dataset
 
-	XT, YT, Xv, Yv, Xt, Yt, NC, prp, taug = load(settings.dataset)
-
-	aug = None
-	#if settings.aug == 0: aug = None
-	#else                : aug = lambda X: taug(X, settings.aug)
+	XT, YT, Xv, Yv, Xt, Yt = load(settings.dataset)
 
 	def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
 
@@ -47,9 +43,9 @@ def main(mainarg):
 
 	## Define Epoch
 
-	def process(X, Y, trn=True, aug=None):
+	def process(X, Y, trn=True):
 
-		err = prg = 0
+		err = smp = 0
 		tic = time.time()
 
 		for i in xrange(0, X.shape[0], settings.batchsize):
@@ -57,24 +53,24 @@ def main(mainarg):
 				Xb = X[i:i+settings.batchsize]
 				Yb = Y[i:i+settings.batchsize]
 
-				Xb = aug(Xb) if aug is not None else Xb
-				Xb = prp(Xb)
+				smp += Xb.shape[0]
+				prg  = float(smp) / X.shape[0]
 
-				prg += Xb.shape[0] / float(X.shape[0])
 				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
+				acc  = float(smp - err) / smp
 				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
 				mem = int(net.size() + datasize + 0.5)
 				if mem > settings.limit > 0: raise MemoryError(mem)
 
-				lprint(' %d' % err, lx, ly)
+				lprint(' %6.4f' % acc, lx, ly)
 
 				rem = (time.time() - tic) * (1.0 - prg) / prg
 				rem = str(datetime.timedelta(seconds=int(rem)))
 
 				lprint('[%6.2f%% | %s left]' % (prg * 100, rem))
 
-		return err
+		return acc
 
 	## Start
 
@@ -87,7 +83,7 @@ def main(mainarg):
 		XT, YT = shuffle(XT, YT)
 
 		lx = (n % cn) * cw
-		ly = th-4; trnerr += [process(XT, YT, aug=aug)  ]; net.solve()
+		ly = th-4; trnerr += [process(XT, YT           )]; net.solve()
 		ly = th-3; valerr += [process(Xv, Yv, trn=False)]
 		ly = th-2; tsterr += [process(Xt, Yt, trn=False)]
 
