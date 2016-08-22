@@ -196,23 +196,30 @@ class PADD(BASE):
 
 		return T[:,:,self.p[0]:-self.p[1],self.p[2]:-self.p[3]]
 
-class TSRZ(BASE): pass
+class FLAT(BASE):
 
-class VCTZ(BASE):
+	def __init__(self, d=1, sh=None):
 
-	def __init__(self, sh=None):
-
+		self.d  = d
 		self.sh = sh
 
 	def forward(self, T, mode=''):
 
-		if self.sh is None: self.__init__(sh=T.shape)
+		T = np.rollaxis(T, 2, T.ndim)
+		T = np.rollaxis(T, 2, T.ndim)
 
-		return T.reshape(T.shape[0], -1)
+		if self.sh is None: self.__init__(d=self.d, sh=T.shape)
+
+		return T.reshape(T.shape[0], -1, *T.shape[T.ndim-(self.d-1):])
 
 	def backward(self, T, mode=''):
 
-		return T.reshape(T.shape[0], *self.sh[1:]) if T is not None else None
+		T = T.reshape(T.shape[0], *self.sh[1:])
+
+		T = np.rollaxis(T, -1, 2)
+		T = np.rollaxis(T, -1, 2)
+
+		return T
 
 class SFMX(BASE):
 

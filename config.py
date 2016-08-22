@@ -35,9 +35,10 @@ cnn_1l = ['conv:0/20,0,5,5', 'mxpl:0/2,2/2,2']
 #cnn_2l = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2']
 #cnn_3l = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2'] + ['conv:500,0,0,0', 'relu']
 
-sfmx = ['vctz:0', 'sfmx:0/10']
+redc = ['flat:0/3','conv:0/20,0,1,1']
+sfmx = ['flat:0', 'sfmx:0/10']
 
-demo = cnn_1l + mlp_1l + sfmx
+demo = mlp_1l + sfmx
 
 ## Hyperparameter Parsing
 
