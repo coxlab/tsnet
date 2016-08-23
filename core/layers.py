@@ -90,7 +90,7 @@ class CONV(BASE):
 		if 'X' in mode: T = uncollapse(T, self.W)
 		else          : T = np.sum(T, 1)[:,None]
 
-		O = np.zeros((self.sh[0], 1) + (self.sh[2]-self.w[2]+1, self.sh[3]-self.w[3]+1) + tuple(self.w[1:]) + T.shape[7:], dtype='float32')
+		O = np.zeros((T.shape[0], 1) + (self.sh[2]-self.w[2]+1, self.sh[3]-self.w[3]+1) + tuple(self.w[1:]) + T.shape[7:], dtype='float32')
 
 		_ = ne.evaluate('T', out=O[self.S]) #O[self.S] = T
 		O = unexpand(O)
@@ -140,7 +140,7 @@ class MXPL(BASE):
 
 	def backward(self, T, mode=''):
 
-		O = np.zeros(self.sh[:2] + (self.sh[2]-self.w[0]+1, self.sh[3]-self.w[1]+1) + tuple(self.w) + T.shape[4:], dtype='float32')
+		O = np.zeros(T.shape[:2] + (self.sh[2]-self.w[0]+1, self.sh[3]-self.w[1]+1) + tuple(self.w) + T.shape[4:], dtype='float32')
 
 		T = T[:,:,:,:,None,None]
 		T = as_strided (T, T.shape[:4] + tuple(self.w) + T.shape[6:], T.strides)

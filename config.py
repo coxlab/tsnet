@@ -15,9 +15,9 @@ parser.add_argument('-save', default='')
 
 ## (Dataset Related)
 
-parser.add_argument('-epoch'    , type=int  , default=50           )
-parser.add_argument('-batchsize', type=int  , default=25           )
-parser.add_argument('-fast'     , type=int  , default=[], nargs='*')
+parser.add_argument('-epoch'    , type=int, default=50           )
+parser.add_argument('-batchsize', type=int, default=25           )
+parser.add_argument('-fast'     , type=int, default=[], nargs='*')
 
 ## (Misc)
 
@@ -27,18 +27,12 @@ parser.add_argument('-quiet', action='store_true')
 
 ## Example Hyperparameters
 
-mlp_1l = ['conv:1/20', 'relu:1']
-#mlp_2l = ['conv:20,0,0,0', 'relu'] + ['conv:50,0,0,0', 'relu']
-#mlp_3l = ['conv:20,0,0,0', 'relu'] + ['conv:50,0,0,0', 'relu'] + ['conv:500,0,0,0', 'relu']
+def c3(n, m=0): return ['padd:{}/1,1,1,1'.format(m), 'conv:{}/{},0,3,3'.format(m,n), 'relu:{}'.format(m)]
+def fc(n, m=0): return ['conv:{}/{}'.format(m,n), 'relu:{}'.format(m)]
+def p2(   m=0): return ['mxpl:{}/2,2/2,2'.format(m)]
 
-cnn_1l = ['conv:0/20,0,5,5', 'mxpl:0/2,2/2,2']
-#cnn_2l = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2']
-#cnn_3l = ['conv:20,0,5,5', 'mxpl:2,2/2,2'] + ['conv:50,0,5,5', 'mxpl:2,2/2,2'] + ['conv:500,0,0,0', 'relu']
-
-redc = ['flat:0/3','conv:0/20,0,1,1']
-sfmx = ['flat:0', 'sfmx:0/10']
-
-demo = mlp_1l + sfmx
+demo = c3(32) + p2() + c3(32) + p2() + c3(64) + p2() + fc(64) + ['flat:0', 'sfmx:0/10']
+#demo = ['conv:1/20', 'relu:1'] + ['flat:0', 'sfmx:0/10']
 
 ## Hyperparameter Parsing
 
