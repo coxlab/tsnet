@@ -3,8 +3,8 @@ import numpy as np
 import os
 from scipy.io import savemat, loadmat
 
-from core.layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
-from core.optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
+from .layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
+from .optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
 class BLK:
 
@@ -28,7 +28,7 @@ class BLK:
 			for L in self.layers: X, Z = L.forward(X, mode='X'), L.forward(Z, mode='Z')
 
 			X = Z
-			for L in self.layers: Z = L.auxforward(Z, mode=auto('Z')) if training and self.mode != 2 else Z
+			for L in self.layers: Z = L.auxforward(Z, mode=auto('Z')) if training and self.mode == 2 else Z
 
 		else: raise ValueError(self.mode)
 
@@ -42,7 +42,7 @@ class BLK:
 
 		elif self.mode in [1,2]: # tensor
 
-			if self.mode == 1:
+			if self.mode == 2:
 
 				A = Y
 				for L in self.layers: A = L.auxforward(A, mode='ZR'); L.auxbackward(A, mode='ZG')
@@ -57,18 +57,30 @@ class BLK:
 
 class NET:
 
-	def __init__(self, hp):
+	def __init__(self, ldefs):
 
 		self.gc     = 0
 		self.blocks = []
 
-		for l in xrange(len(hp)):
+		for ldef in ldefs:
 
-			m = hp[l][1]
-			if not self.blocks or m != self.blocks[-1].mode: self.blocks += [BLK(m)]
+			ldef = ldef.replace('/',':').split(':')
 
-			L = eval(hp[l][0])
-			self.blocks[-1].layers += [L(*hp[l][2:])]
+			name = ldef[0].upper()
+			mode = int(ldef[1])
+
+			if not self.blocks or mode != self.blocks[-1].mode: self.blocks += [BLK(mode)]
+
+			params = []
+
+			for pdef in ldef[2:]:
+
+				try   : params += [[int  (p) for p in pdef.split(',')]]
+				except: params += [[float(p) for p in pdef.split(',')]]
+
+				if len(params[-1]) == 1: params[-1] = params[-1][0]
+
+			self.blocks[-1].layers += [eval(name)(*params)]
 
 		self.blocks[0].first = True
 		self.layers          = [L for B in self.blocks for L in B.layers]
@@ -146,7 +158,5 @@ class NET:
 		self.gc = 0
 		for L in self.layers: L.reset()
 
-	def size(self):
-
-		return sum([getattr(L, P).nbytes for L in self.layers for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
+	#def size(self): return sum([getattr(L, P).nbytes for L in self.layers for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
 

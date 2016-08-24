@@ -17,8 +17,6 @@ def regularize(obj, l2reg):
 
 	return obj
 
-VARS = ['A', 'D', 'M', 'V']
-
 def SGD(obj, t=0, lr=1e-3, l2reg=1e-3, momentum=0.9, nesterov=0):
 
 	obj = regularize(obj, l2reg)

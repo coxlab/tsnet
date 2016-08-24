@@ -6,9 +6,9 @@ import warnings; warnings.filterwarnings('ignore')
 
 import numpy as np
 
-from config import parser, spec2hp
+from config import parser, demo
 from datasets.loader import load
-from core.network import NET
+from tsnet.numpy.network import NET
 
 def main(arg):
 
@@ -29,17 +29,9 @@ def main(arg):
 
 	XT, YT, Xv, Yv, Xt, Yt = load(settings.dataset)
 
-	def shuffle(X, Y): I = np.random.permutation(X.shape[0]); return X[I], Y[I]
-
-	if settings.fast:
-		if len(settings.fast) != 3: Xt = Xt[:settings.fast[0]]
-		else                      : XT = XT[:settings.fast[0]]; Xv = Xv[:settings.fast[1]]; Xt = Xt[:settings.fast[2]]
-
-	datasize = sum(subset.nbytes for subset in [XT,YT,Xv,Yv,Xt,Yt]) / 1024.0**2
-
 	## Load Network
 
-	net = NET(spec2hp(settings.network)); net.load(settings.load)
+	net = NET(demo); net.load(settings.load)
 
 	## Define Epoch
 
@@ -60,9 +52,6 @@ def main(arg):
 				acc  = float(smp - err) / smp
 				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
-				mem = int(net.size() + datasize + 0.5)
-				if mem > settings.limit > 0: raise MemoryError(mem)
-
 				lprint(' %6.4f' % acc, lx, ly)
 
 				rem = (time.time() - tic) * (1.0 - prg) / prg
@@ -74,18 +63,18 @@ def main(arg):
 
 	## Start
 
-	trnerr, valerr, tsterr = ([] for i in xrange(3))
+	trn, val, tst = ([] for i in xrange(3))
 
 	for n in xrange(settings.epoch):
 
 		if (n % cn) == 0: lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n'*4)
 
-		XT, YT = shuffle(XT, YT)
+		I = np.random.permutation(XT.shape[0]); XT, YT = XT[I], YT[I]
 
 		lx = (n % cn) * cw
-		ly = th-4; trnerr += [process(XT, YT           )]; net.solve()
-		ly = th-3; valerr += [process(Xv, Yv, trn=False)]
-		ly = th-2; tsterr += [process(Xt, Yt, trn=False)]
+		ly = th-4; trn += [process(XT, YT           )]; net.solve()
+		ly = th-3; val += [process(Xv, Yv, trn=False)]
+		ly = th-2; tst += [process(Xt, Yt, trn=False)]
 
 		net.save(settings.save)
 
@@ -93,7 +82,7 @@ def main(arg):
 
 	## Return
 
-	if settings.quiet: return trnerr, valerr, tsterr
+	if settings.quiet: return trn, val, tst
 	else             : return ''
 
 ## Run
