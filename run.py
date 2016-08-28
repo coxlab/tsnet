@@ -1,91 +1,61 @@
 from __future__ import print_function
-from blessings import Terminal; term = Terminal()
-
-import sys, time, datetime
 import warnings; warnings.filterwarnings('ignore')
 
-import numpy as np
+## Load Settings
 
-from config import parser, demo
-from datasets.loader import load
-from tsnet.numpy.network import NET
+import argparse; parser = argparse.ArgumentParser()
 
-def main(arg):
+parser.add_argument('-dataset', default='mnist')
 
-	## Load Settings
+parser.add_argument('-network', default=[], nargs='*')
+parser.add_argument('-load'   , default=''           )
+parser.add_argument('-save'   , default=''           )
 
-	settings = parser.parse_args(arg); np.random.seed(settings.seed)
-	settings.lrnparam = [0] + settings.lrnparam
+parser.add_argument('-epoch'    , type=int  , default=100          )
+parser.add_argument('-batchsize', type=int  , default=25           )
+parser.add_argument('-lrnalg'   ,             default='sgd'        )
+parser.add_argument('-lrnparam' , type=float, default=[], nargs='*')
 
-	tw, th = (term.width, term.height) if not settings.quiet else (80, 24)
-	cw, cn = (7, tw / 7)
-	lx, ly = (0, 0)
+parser.add_argument('-keras'  , action='store_true')
+parser.add_argument('-seed'   , type=int, default=0)
+parser.add_argument('-verbose', type=int, default=2)
 
-	def lprint(msg, lx=0, ly=th-1):
-		if not settings.quiet:
-			with term.location(lx, ly): print(msg, end='')
+settings = parser.parse_args();
 
-	## Load Dataset
+import numpy as np; np.random.seed(settings.seed)
 
-	XT, YT, Xv, Yv, Xt, Yt = load(settings.dataset)
+## Load Dataset
 
-	## Load Network
+exec 'from kerosene.datasets import %s as dataset' % settings.dataset
 
-	net = NET(demo); net.load(settings.load)
+(X_trn, y_trn), (X_tst, y_tst) = dataset.load_data()
 
-	## Define Epoch
+if settings.dataset == 'svhn2':
 
-	def process(X, Y, trn=True):
+	(X_ext, y_ext) = dataset.load_data(sets=['extra'])[0]
+	(X_trn, y_trn) = np.concatenate([X_trn, X_ext]), np.concatenate([y_trn, y_ext])
 
-		err = smp = 0
-		tic = time.time()
+	y_trn -= 1
+	y_tst -= 1
 
-		for i in xrange(0, X.shape[0], settings.batchsize):
+X_avg  = np.mean(X_trn, axis=0, keepdims=True)
+X_trn -= X_avg
+X_tst -= X_avg
 
-				Xb = X[i:i+settings.batchsize]
-				Yb = Y[i:i+settings.batchsize]
+y_trn = np.squeeze(y_trn)
+y_tst = np.squeeze(y_tst)
 
-				smp += Xb.shape[0]
-				prg  = float(smp) / X.shape[0]
-
-				err += np.count_nonzero(net.forward(Xb, trn) != Yb)
-				acc  = float(smp - err) / smp
-				rep  = net.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
-
-				lprint(' %6.4f' % acc, lx, ly)
-
-				rem = (time.time() - tic) * (1.0 - prg) / prg
-				rem = str(datetime.timedelta(seconds=int(rem)))
-
-				lprint('[%6.2f%% | %s left]' % (prg * 100, rem))
-
-		return acc
-
-	## Start
-
-	trn, val, tst = ([] for i in xrange(3))
-
-	for n in xrange(settings.epoch):
-
-		if (n % cn) == 0: lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n'*4)
-
-		I = np.random.permutation(XT.shape[0]); XT, YT = XT[I], YT[I]
-
-		lx = (n % cn) * cw
-		ly = th-4; trn += [process(XT, YT           )]; net.solve()
-		ly = th-3; val += [process(Xv, Yv, trn=False)]
-		ly = th-2; tst += [process(Xt, Yt, trn=False)]
-
-		net.save(settings.save)
-
-	lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
-
-	## Return
-
-	if settings.quiet: return trn, val, tst
-	else             : return ''
+dataset = (X_trn,y_trn,X_tst,y_tst,[],[])
 
 ## Run
 
-if __name__ == '__main__': print(main(sys.argv[1:]), end='')
+if not settings.network:
 
+	settings.network = ['conv:2/20', 'relu:2'] + ['flat:0', 'sfmx:0/10']
+
+if not settings.keras:
+
+	from tsnet.numpy.network import NET
+
+	net = NET(settings.network); net.load(settings.load)
+	net.fit(dataset, settings)

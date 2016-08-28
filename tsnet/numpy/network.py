@@ -1,6 +1,8 @@
-import numpy as np
+from __future__ import print_function
+from blessings import Terminal; term = Terminal()
 
-import os
+import os, time, datetime
+import numpy as np
 from scipy.io import savemat, loadmat
 
 from .layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
@@ -113,7 +115,7 @@ class NET:
 			report['G'] += [np.linalg.norm(L.G)]; optimize(L, *param)
 			report['W'] += [np.linalg.norm(L.W)]
 
-		self.reset()
+		self.reset('G')
 		param[0] += 1 # time
 
 		report['W'] = np.linalg.norm(report['W'])
@@ -153,10 +155,73 @@ class NET:
 
 			L.W = Ws[-1]; Ws = Ws[:-1]
 
-	def reset(self):
+	def reset(self, attrs):
 
-		self.gc = 0
-		for L in self.layers: L.reset()
+		if 'G' in attrs: self.gc = 0
 
-	#def size(self): return sum([getattr(L, P).nbytes for L in self.layers for P in dir(L) if hasattr(getattr(L, P), 'nbytes')]) / 1024.0**2
+		for L in self.layers: L.reset(attrs)
 
+	def fit(self, dataset, settings):
+
+		XT, YT, Xv, Yv, Xt, Yt = dataset
+		settings.lrnparam = [0] + settings.lrnparam # time
+
+		tw, th = (term.width, term.height) if settings.verbose else (80, 24)
+		cw, cn = (7, tw / 7)
+		lx, ly = (0, 0)
+
+		def lprint(msg, lx=0, ly=th-1):
+			if settings.verbose:
+				with term.location(lx, ly): print(msg, end='')
+
+		## Define Epoch
+
+		def process(X, Y, trn=True):
+
+			acc = err = smp = 0
+			tic = time.time()
+
+			for i in xrange(0, len(X), settings.batchsize):
+
+					Xb = X[i:i+settings.batchsize]
+					Yb = Y[i:i+settings.batchsize]
+
+					smp += Xb.shape[0]
+					prg  = float(smp) / X.shape[0]
+
+					err += np.count_nonzero(self.forward(Xb, trn) != Yb)
+					acc  = float(smp - err) / smp
+					rep  = self.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
+
+					if settings.verbose == 1: lprint(' %6.4f' % acc, lx, ly)
+
+					rem = (time.time() - tic) * (1.0 - prg) / prg
+					rem = str(datetime.timedelta(seconds=int(rem)))
+
+					if settings.verbose == 1: lprint('[%6.2f%% | %s left]' % (prg * 100, rem))
+
+			lprint(' %6.4f' % acc, lx, ly)
+			return acc
+
+		## Start
+
+		trn, val, tst = ([] for i in xrange(3))
+
+		for n in xrange(settings.epoch):
+
+			if (n % cn) == 0: lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n'*4)
+
+			I = np.random.permutation(XT.shape[0]); XT, YT = XT[I], YT[I]
+
+			lx = (n % cn) * cw
+			ly = th-4; trn += [process(XT, YT           )]; self.solve()
+			ly = th-3; val += [process(Xv, Yv, trn=False)]
+			ly = th-2; tst += [process(Xt, Yt, trn=False)]
+
+			self.save(settings.save)
+
+		lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
+
+		## Print
+
+		if not settings.verbose: print(trn); print(val); print(tst)

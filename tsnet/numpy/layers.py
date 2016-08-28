@@ -98,9 +98,10 @@ class BASE:
 	def auxforward (self, T, mode=''): return T
 	def auxbackward(self, T, mode=''): return T
 
-	def reset(self):
+	def reset(self, attrs='G'):
 
-		if hasattr(self, 'G'): del self.G
+		for attr in attrs:
+			if hasattr(self, attr): delattr(self, attr)
 
 	def accumulate(self, G):
 
@@ -375,7 +376,3 @@ class RDGE(BASE):
 
 		#self.SII[DI] = D
 
-	#def reset(self):
-
-	#	if hasattr(self, 'G'): del self.G
-	#	self.SII = self.SIO = None
