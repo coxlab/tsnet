@@ -3,18 +3,20 @@ import warnings; warnings.filterwarnings('ignore')
 
 ## Load Settings
 
+ex = ['conv:2/20', 'relu:2', 'flat:0', 'sfmx:0/10']
+
 import argparse; parser = argparse.ArgumentParser()
 
 parser.add_argument('-dataset', default='mnist')
 
-parser.add_argument('-network', default=[], nargs='*')
+parser.add_argument('-network', default=ex, nargs='*')
 parser.add_argument('-load'   , default=''           )
 parser.add_argument('-save'   , default=''           )
 
-parser.add_argument('-epoch'    , type=int  , default=100          )
-parser.add_argument('-batchsize', type=int  , default=25           )
-parser.add_argument('-lrnalg'   ,             default='sgd'        )
-parser.add_argument('-lrnparam' , type=float, default=[], nargs='*')
+parser.add_argument('-epoch'    , type=int  , default=100                       )
+parser.add_argument('-batchsize', type=int  , default=32                        )
+parser.add_argument('-lrnalg'   ,             default='sgd'                     )
+parser.add_argument('-lrnparam' , type=float, default=[1e-3,1e-3,0.9], nargs='*')
 
 parser.add_argument('-keras'  , action='store_true')
 parser.add_argument('-seed'   , type=int, default=0)
@@ -49,13 +51,9 @@ dataset = (X_trn,y_trn,X_tst,y_tst,[],[])
 
 ## Run
 
-if not settings.network:
+if settings.keras: l2decay = settings.lrnparam[1:2]; settings.lrnparam = settings.lrnparam[:1] + settings.lrnparam[2:]
 
-	settings.network = ['conv:2/20', 'relu:2'] + ['flat:0', 'sfmx:0/10']
+exec 'from tsnet.%s.network import NET' % ('numpy' if not settings.keras else 'keras')
+net = NET(settings.network) if not settings.keras else NET(settings.network, X_trn.shape[1:], *l2decay)
 
-if not settings.keras:
-
-	from tsnet.numpy.network import NET
-
-	net = NET(settings.network); net.load(settings.load)
-	net.fit(dataset, settings)
+net.fit(dataset, settings)

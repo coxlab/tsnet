@@ -6,7 +6,7 @@ import numpy as np
 from scipy.io import savemat, loadmat
 
 from .layers import CONV, MXPL, RELU, PADD, FLAT, SFMX, RDGE
-from .optimizers import SGD, ASGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
+from .optimizers import SGD, ADADELTA, ADAM, RMSPROP, ADAGRAD
 
 class BLK:
 
