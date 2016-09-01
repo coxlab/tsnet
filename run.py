@@ -3,18 +3,18 @@ import warnings; warnings.filterwarnings('ignore')
 
 ## Load Settings
 
-ex = ['conv:2/20', 'relu:2', 'flat:0', 'sfmx:0/10']
+demo = ['conv:2/20', 'relu:2', 'flat:0', 'sfmx:0/10']
 
 import argparse; parser = argparse.ArgumentParser()
 
 parser.add_argument('-dataset', default='mnist')
 
-parser.add_argument('-network', default=ex, nargs='*')
-parser.add_argument('-load'   , default=''           )
-parser.add_argument('-save'   , default=''           )
+parser.add_argument('-network', default=demo, nargs='*')
+parser.add_argument('-load'   , default=''             )
+parser.add_argument('-save'   , default=''             )
 
 parser.add_argument('-epoch'    , type=int  , default=100                       )
-parser.add_argument('-batchsize', type=int  , default=32                        )
+parser.add_argument('-batchsize', type=int  , default=128                       )
 parser.add_argument('-lrnalg'   ,             default='sgd'                     )
 parser.add_argument('-lrnparam' , type=float, default=[1e-3,1e-3,0.9], nargs='*')
 
@@ -32,7 +32,12 @@ exec 'from kerosene.datasets import %s as dataset' % settings.dataset
 
 (X_trn, y_trn), (X_tst, y_tst) = dataset.load_data()
 
-if settings.dataset == 'svhn2':
+if settings.dataset == 'mnist':
+
+	X_trn = np.pad(X_trn, ((0,0),(0,0),(2,2),(2,2)), 'constant')
+	X_tst = np.pad(X_tst, ((0,0),(0,0),(2,2),(2,2)), 'constant')
+
+elif settings.dataset == 'svhn2':
 
 	(X_ext, y_ext) = dataset.load_data(sets=['extra'])[0]
 	(X_trn, y_trn) = np.concatenate([X_trn, X_ext]), np.concatenate([y_trn, y_ext])
@@ -43,17 +48,14 @@ if settings.dataset == 'svhn2':
 X_avg  = np.mean(X_trn, axis=0, keepdims=True)
 X_trn -= X_avg
 X_tst -= X_avg
-
-y_trn = np.squeeze(y_trn)
-y_tst = np.squeeze(y_tst)
+y_trn  = np.squeeze(y_trn)
+y_tst  = np.squeeze(y_tst)
 
 dataset = (X_trn,y_trn,X_tst,y_tst,[],[])
 
 ## Run
 
-if settings.keras: l2decay = settings.lrnparam[1:2]; settings.lrnparam = settings.lrnparam[:1] + settings.lrnparam[2:]
+exec 'from core.%s.network import NET' % ('numpy' if not settings.keras else 'keras')
 
-exec 'from tsnet.%s.network import NET' % ('numpy' if not settings.keras else 'keras')
-net = NET(settings.network) if not settings.keras else NET(settings.network, X_trn.shape[1:], *l2decay)
+NET(settings.network, X_trn.shape[1:], *([settings.lrnparam[1]] if len(settings.lrnparam) > 1 else [])).fit(dataset, settings)
 
-net.fit(dataset, settings)

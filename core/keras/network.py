@@ -8,7 +8,7 @@ from keras.utils import np_utils
 
 class NET:
 
-	def __init__(self, ldefs, ishape, l2decay=1e-3):
+	def __init__(self, ldefs, ishape, l2decay=1e-2):
 
 		i = Input(ishape); l = i; flat = False
 
@@ -57,9 +57,9 @@ class NET:
 		y_trn = np_utils.to_categorical(y_trn, 10 if settings.dataset != 'cifar100' else 100)
 		y_tst = np_utils.to_categorical(y_tst, 10 if settings.dataset != 'cifar100' else 100)
 
-		if settings.lrnalg == 'sgd': settings.lrnparam = settings.lrnparam[:2] + [0.0] + settings.lrnparam[2:]
-		optimizer = eval(settings.lrnalg)(*settings.lrnparam)
+		settings.lrnparam = (settings.lrnparam[:1] + settings.lrnparam[2:])
+		settings.lrnparam = (settings.lrnparam[:2] + [0.0] + settings.lrnparam[2:]) if settings.lrnalg == 'sgd' else settings.lrnparam
 
-		self.model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=["accuracy"])
+		self.model.compile(loss='categorical_crossentropy', optimizer=eval(settings.lrnalg)(*settings.lrnparam), metrics=["accuracy"])
 		self.model.fit    (X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_tst, y_tst), verbose=settings.verbose)
 

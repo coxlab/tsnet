@@ -59,7 +59,7 @@ class BLK:
 
 class NET:
 
-	def __init__(self, ldefs):
+	def __init__(self, ldefs, *_):
 
 		self.gc     = 0
 		self.blocks = []
