@@ -61,5 +61,5 @@ class NET:
 		settings.lrnparam = (settings.lrnparam[:2] + [0.0] + settings.lrnparam[2:]) if settings.lrnalg == 'sgd' else settings.lrnparam
 
 		self.model.compile(loss='categorical_crossentropy', optimizer=eval(settings.lrnalg)(*settings.lrnparam), metrics=["accuracy"])
-		self.model.fit    (X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_tst, y_tst), verbose=settings.verbose)
+		return self.model.fit(X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_tst, y_tst), verbose=settings.verbose)
 
