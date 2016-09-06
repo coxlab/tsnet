@@ -23,7 +23,10 @@ from .datasets import load
 
 def run(settings, dataset=None):
 
-	settings = parser.parse_args(settings); np.random.seed(settings.seed)
+	settings = settings.split() if type(settings) is str else settings
+	settings = parser.parse_args(settings)
+
+	np.random.seed(settings.seed)
 
 	if dataset is None: dataset = load(settings.dataset)
 
@@ -31,7 +34,6 @@ def run(settings, dataset=None):
 	else                 : from .core_keras.network import NET
 
 	net = NET(settings.network, dataset[0].shape[1:], *([settings.lrnparam[1]] if len(settings.lrnparam) > 1 else []))
-	res = net.fit(dataset, settings)
+	hst = net.fit(dataset, settings)
 
-	return res
-
+	return hst

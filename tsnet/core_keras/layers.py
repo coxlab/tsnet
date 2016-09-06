@@ -1,5 +1,6 @@
 from keras import backend as K
 from keras.layers import Dense, Convolution2D
+from itertools import product
 
 class DenseTS(Dense):
 
@@ -14,20 +15,33 @@ class DenseTS(Dense):
 
 		return K.reshape(x, (x.shape[0], -1)) #K.batch_flatten(x)
 
-class ConvolutionTS(Convolution2D):
+def im2col(x, r, c): # THEANO ONLY
 
-	def __init__(self, nb_filter, nb_row, nb_col, **kwargs):
+	if r == c == 1: return x
 
-		if not nb_row == nb_col == 1: raise ValueError((nb_row, nb_col))
+	x = K.spatial_2d_padding(x, padding=(r/2, c/2))
+	v = []
 
-		super(ConvolutionTS, self).__init__(nb_filter, 1, 1, trainable=False, **kwargs) #bias=False
+	def last(i, w): i -= (w-1); return i if i != 0 else None
 
-	def get_output_shape_for(self, input_shape): return (input_shape[0], input_shape[1] * self.nb_filter) + input_shape[2:]
+	for i, j in product(xrange(r), xrange(c)): v += [x[:,:,i:last(i,r),j:last(j,c)]]
+
+	return K.concatenate(v, axis=1)
+
+class ConvolutionTS(Convolution2D): # THEANO ONLY
+
+	def __init__(self, nb_filter, nb_row, nb_col, **kwargs): super(ConvolutionTS, self).__init__(nb_filter, nb_row, nb_col, trainable=False, **kwargs) #bias=False
+
+	def get_output_shape_for(self, input_shape):
+
+		sh = super(ConvolutionTS, self).get_output_shape_for(input_shape)
+
+		return (sh[0], sh[1] * input_shape[1] * self.nb_row * self.nb_col, sh[2], sh[3])
 
 	def call(self, x, mask=None):
 
 		s = super(ConvolutionTS, self).call(x, mask=None) > 0
-		x = K.expand_dims(x, 1) * K.expand_dims(s, 2)
+		x = K.expand_dims(im2col(x, self.nb_row, self.nb_col), 1) * K.expand_dims(s, 2)
 
 		return K.reshape(x, (x.shape[0], -1, x.shape[-2], x.shape[-1]))
 

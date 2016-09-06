@@ -222,6 +222,6 @@ class NET:
 
 		lprint('-'*(cn*cw-25) + ' ' + time.ctime() + '\n')
 
-		## Print
+		## Finish
 
-		if not settings.verbose: print(trn); print(val); print(tst)
+		return {'acc': trn, 'val_acc': val, 'tst_acc': tst}

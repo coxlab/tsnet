@@ -1,4 +1,2 @@
 import sys
-from tsnet.launcher import run
-
-if __name__ == '__main__': run(sys.argv[1:])
+from tsnet.launcher import run; run(sys.argv[1:])
