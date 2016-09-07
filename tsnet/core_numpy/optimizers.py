@@ -17,7 +17,7 @@ def regularize(obj, l2reg):
 
 	return obj
 
-def SGD(obj, t=0, lr=1e-2, l2reg=1e-2, momentum=0.0, nesterov=0):
+def SGD(obj, t=0, lr=1e-2, l2reg=1e-2, momentum=0.0, _=0.0, nesterov=0):
 
 	obj = regularize(obj, l2reg)
 	lrW = lr #schedule(t, lr, l2reg)

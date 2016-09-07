@@ -9,10 +9,10 @@ parser.add_argument('-network', default=toy, nargs='*')
 parser.add_argument('-load'   , default=''            )
 parser.add_argument('-save'   , default=''            )
 
-parser.add_argument('-epoch'    , type=int  , default=100                       )
-parser.add_argument('-batchsize', type=int  , default=128                       )
-parser.add_argument('-lrnalg'   ,             default='sgd'                     )
-parser.add_argument('-lrnparam' , type=float, default=[1e-3,1e-3,0.9], nargs='*')
+parser.add_argument('-epoch'    , type=int  , default=100          )
+parser.add_argument('-batchsize', type=int  , default=128          )
+parser.add_argument('-lrnalg'   ,             default='sgd'        )
+parser.add_argument('-lrnparam' , type=float, default=[], nargs='*')
 
 parser.add_argument('-keras'  , action='store_true')
 parser.add_argument('-seed'   , type=int, default=0)
@@ -33,7 +33,7 @@ def run(settings, dataset=None):
 	if not settings.keras: from .core_numpy.network import NET
 	else                 : from .core_keras.network import NET
 
-	net = NET(settings.network, dataset[0].shape[1:], *([settings.lrnparam[1]] if len(settings.lrnparam) > 1 else []))
+	net = NET(settings.network, dataset[0].shape[1:], settings.lrnparam)
 	hst = net.fit(dataset, settings)
 
 	return hst

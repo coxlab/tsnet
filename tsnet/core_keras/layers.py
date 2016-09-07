@@ -4,7 +4,7 @@ from itertools import product
 
 class DenseTS(Dense):
 
-	def __init__(self, output_dim, **kwargs): super(DenseTS, self).__init__(output_dim, trainable=False, **kwargs) #bias=False
+	def __init__(self, output_dim, **kwargs): super(DenseTS, self).__init__(output_dim, bias=False, trainable=False, **kwargs)
 
 	def get_output_shape_for(self, input_shape): return (input_shape[0], input_shape[1] * self.output_dim)
 
@@ -30,7 +30,7 @@ def im2col(x, r, c): # THEANO ONLY
 
 class ConvolutionTS(Convolution2D): # THEANO ONLY
 
-	def __init__(self, nb_filter, nb_row, nb_col, **kwargs): super(ConvolutionTS, self).__init__(nb_filter, nb_row, nb_col, trainable=False, **kwargs) #bias=False
+	def __init__(self, nb_filter, nb_row, nb_col, **kwargs): super(ConvolutionTS, self).__init__(nb_filter, nb_row, nb_col, bias=False, trainable=False, **kwargs)
 
 	def get_output_shape_for(self, input_shape):
 

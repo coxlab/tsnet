@@ -8,9 +8,11 @@ from keras.utils import np_utils
 
 class NET:
 
-	def __init__(self, ldefs, ishape, l2decay=1e-2):
+	def __init__(self, ldefs, ishape, lrnparam):
 
-		i = Input(ishape); l = i; flat = False
+		I     = Input(ishape); L = I
+		flat  = False
+		decay = l2(*lrnparam[1:2])
 
 		for ldef in ldefs:
 
@@ -30,21 +32,21 @@ class NET:
 
 			if name == 'CONV':
 
-				if not flat and type(params[0]) is int: l = Flatten()(l); flat = True
+				if not flat and type(params[0]) is int: L = Flatten()(L); flat = True
 
 				if flat: GenConv = Dense         if mode == 0 else DenseTS      ; params = [params[0]]
 				else   : GenConv = Convolution2D if mode == 0 else ConvolutionTS; params = [params[0][0], params[0][2], params[0][3]]
 
-				l = GenConv(*params, W_regularizer=l2(l2decay), bias=False, **({} if flat else {'border_mode':'same'}))(l)
+				L = GenConv(*params, W_regularizer=decay, b_regularizer=decay, **({} if flat else {'border_mode':'same'}))(L)
 
-			elif name == 'MXPL': l = MaxPooling2D(*params)(l)
-			elif name == 'RELU': l = Activation('relu')(l) if mode == 0 else l
+			elif name == 'MXPL': L = MaxPooling2D(*params)(L)
+			elif name == 'RELU': L = Activation('relu')(L) if mode == 0 else L
 			elif name == 'PADD': pass
-			elif name == 'FLAT': l = Flatten()(l) if not flat else l
-			elif name == 'SFMX': l = Dense(*params, activation='softmax', W_regularizer=l2(l2decay), bias=False)(l)
+			elif name == 'FLAT': L = Flatten()(L) if not flat else L
+			elif name == 'SFMX': L = Dense(*params, activation='softmax', W_regularizer=decay, b_regularizer=decay)(L)
 			else: raise NameError(name)
 
-		self.model = Model(input=i, output=l)
+		self.model = Model(input=I, output=L)
 		self.model.summary()
 
 	def load(self, fn): pass
@@ -58,7 +60,6 @@ class NET:
 		y_tst = np_utils.to_categorical(y_tst, 10 if settings.dataset != 'cifar100' else 100)
 
 		settings.lrnparam = (settings.lrnparam[:1] + settings.lrnparam[2:])
-		settings.lrnparam = (settings.lrnparam[:2] + [0.0] + settings.lrnparam[2:]) if settings.lrnalg == 'sgd' else settings.lrnparam
 
 		self.model.compile(loss='categorical_crossentropy', optimizer=eval(settings.lrnalg)(*settings.lrnparam), metrics=["accuracy"])
 		return self.model.fit(X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_tst, y_tst), verbose=settings.verbose).history
