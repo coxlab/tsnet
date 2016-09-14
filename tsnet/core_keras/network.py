@@ -4,7 +4,9 @@ from .layers import DenseTS, ConvolutionTS
 
 from keras.optimizers import sgd, rmsprop, adagrad, adadelta, adam
 from keras.regularizers import l2
+
 from keras.utils import np_utils
+from keras.callbacks import Callback
 
 class NET:
 
@@ -54,13 +56,24 @@ class NET:
 
 	def fit(self, dataset, settings):
 
-		X_trn, y_trn, X_tst, y_tst, _, _ = dataset
+		X_trn, y_trn, X_val, y_val, X_tst, y_tst = dataset
 
 		y_trn = np_utils.to_categorical(y_trn, 10 if settings.dataset != 'cifar100' else 100)
+		y_val = np_utils.to_categorical(y_val, 10 if settings.dataset != 'cifar100' else 100)
 		y_tst = np_utils.to_categorical(y_tst, 10 if settings.dataset != 'cifar100' else 100)
 
 		settings.lrnparam = (settings.lrnparam[:1] + settings.lrnparam[2:])
 
 		self.model.compile(loss='categorical_crossentropy', optimizer=eval(settings.lrnalg)(*settings.lrnparam), metrics=["accuracy"])
-		return self.model.fit(X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_tst, y_tst), verbose=settings.verbose).history
+
+		class PerEpochTest(Callback):
+
+			def on_epoch_end(self, epoch, logs={}):
+
+				self.model.history.history['tst_acc']  = [] if 'tst_acc' not in self.model.history.history else self.model.history.history['tst_acc']
+				self.model.history.history['tst_acc'] += [self.model.evaluate(X_tst, y_tst, batch_size=settings.batchsize, verbose=0)[1]]
+
+		self.model.fit(X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_val, y_val), callbacks=[PerEpochTest()], verbose=settings.verbose)
+
+		return self.model.history.history
 
