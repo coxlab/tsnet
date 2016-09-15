@@ -7,6 +7,7 @@ from keras.regularizers import l2
 
 from keras.utils import np_utils
 from keras.callbacks import Callback
+from ..datasets import augment
 
 class NET:
 
@@ -73,7 +74,11 @@ class NET:
 				self.model.history.history['tst_acc']  = [] if 'tst_acc' not in self.model.history.history else self.model.history.history['tst_acc']
 				self.model.history.history['tst_acc'] += [self.model.evaluate(X_tst, y_tst, batch_size=settings.batchsize, verbose=0)[1]]
 
-		self.model.fit(X_trn, y_trn, batch_size=settings.batchsize, nb_epoch=settings.epoch, validation_data=(X_val, y_val), callbacks=[PerEpochTest()], verbose=settings.verbose)
+		aug = augment(settings.dataset) if settings.augment else None
+		arg = {'nb_epoch':settings.epoch, 'validation_data':(X_val, y_val), 'callbacks':[PerEpochTest()], 'verbose':settings.verbose}
+
+		if aug is None: self.model.fit          (         X_trn, y_trn, batch_size=settings.batchsize,                                                               **arg)
+		else          : self.model.fit_generator(aug.flow(X_trn, y_trn, batch_size=settings.batchsize), samples_per_epoch=len(X_trn), nb_worker=4, pickle_safe=True, **arg)
 
 		return self.model.history.history
 

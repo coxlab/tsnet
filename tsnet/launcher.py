@@ -15,6 +15,7 @@ parser.add_argument('-lrnalg'   ,             default='sgd'        )
 parser.add_argument('-lrnparam' , type=float, default=[], nargs='*')
 
 parser.add_argument('-keras'  , action='store_true')
+parser.add_argument('-augment', action='store_true')
 parser.add_argument('-seed'   , type=int, default=0)
 parser.add_argument('-verbose', type=int, default=2)
 
