@@ -1,9 +1,10 @@
+import numpy as np
 from itertools import product
 
 from tsnet.datasets import load
 from tsnet.launcher import run
 
-DS = ['cifar10','cifar100','mnist','svhn2']
+DS = ['mnist','cifar10','svhn2']
 
 def conv(n   ): return ['padd:0/1,1,1,1', 'conv:0/{},0,3,3'.format(n), 'relu:0']
 def pool(    ): return ['mxpl:0/2,2/2,2']
@@ -17,7 +18,7 @@ for ds in DS:
 	dataset  = load(ds)
 	settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -k -v 2' % (100 if ds != 'svhn2' else 50)
 
-	for bd1, bd2, bd3, bd4, m in product([1,2,3], [1,2,3], [1,2,3], [1,2], [0,1]):
+	for bd1, bd2, bd3, bd4, m in product([1,2,3], [1,2,3], [1,2,3], [1,2,3], [0,1]):
 
 		par = [str(p) for p in [ds, bd1, bd2, bd3, bd4, m]]
 		par = '-'.join(par)
@@ -30,13 +31,14 @@ for ds in DS:
 		net +=       full(0, 256)
 		net += bd4 * full(m, 256)
 		net  = net[:-1] if m == 1 else net
-		net += sfmx(10 if ds != 'cifar100' else 100)
+		net += sfmx(10)
 		net  = ' '.join(net)
 
 		hst = run(settings.format(ds, net), dataset)
-		acc = hst['val_acc']
+		val = hst['val_acc']
+		tst = hst['tst_acc']
 
-		log.write(par + ' ' + str(acc[0]) + ' ' + str(max(acc)) + '\n')
+		log.write(par + ' ' + str(tst[0]) + ' ' + str(tst[np.argmax(val)]) + '\n')
 		log.flush()
 
 log.close()

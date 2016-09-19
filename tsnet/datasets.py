@@ -1,37 +1,51 @@
 import numpy as np
+from sklearn.decomposition import PCA
 from keras.preprocessing.image import ImageDataGenerator
+from scipy.io import savemat
 
-def load(dataset='mnist', padding=True, extra=True):
+def load(dataset='mnist', dim=0, extra=True):
 
-	if   dataset == 'mnist'   : from kerosene.datasets import mnist    as D; val_len = 5000; (X_trn, y_trn), (X_tst, y_tst) = D.load_data()
-	elif dataset == 'cifar10' : from kerosene.datasets import cifar10  as D; val_len = 5000; (X_trn, y_trn), (X_tst, y_tst) = D.load_data()
-	elif dataset == 'cifar100': from kerosene.datasets import cifar100 as D; val_len = 5000; (X_trn, y_trn), (X_tst, y_tst) = D.load_data(sources=['features', 'fine_labels'])
-	elif dataset == 'svhn2'   : from kerosene.datasets import svhn2    as D; val_len = 5000; (X_trn, y_trn), (X_tst, y_tst) = D.load_data()
+	# Load Dataset
+
+	if   dataset == 'mnist'  : from kerosene.datasets import mnist   as D
+	elif dataset == 'cifar10': from kerosene.datasets import cifar10 as D
+	elif dataset == 'svhn2'  : from kerosene.datasets import svhn2   as D
 	else: raise ValueError(dataset)
 
-	if dataset == 'mnist' and padding:
+	(X_trn, y_trn), (X_tst, y_tst) = D.load_data()
+
+	X_val, y_val = X_trn[-5000:], y_trn[-5000:]
+	X_trn, y_trn = X_trn[:-5000], y_trn[:-5000]
+
+	if dataset == 'svhn2' and extra:
+
+		(X_ext, y_ext) = D.load_data(sets=['extra'])[0]
+		(X_trn, y_trn) = np.concatenate([X_trn, X_ext]), np.concatenate([y_trn, y_ext])
+
+	# Preprocessing X
+
+	if dataset == 'mnist':
 
 		X_trn = np.pad(X_trn, ((0,0),(0,0),(2,2),(2,2)), 'constant')
+		X_val = np.pad(X_val, ((0,0),(0,0),(2,2),(2,2)), 'constant')
 		X_tst = np.pad(X_tst, ((0,0),(0,0),(2,2),(2,2)), 'constant')
-
-	elif dataset == 'svhn2':
-
-		if extra:
-			(X_ext, y_ext) = D.load_data(sets=['extra'])[0]
-			(X_trn, y_trn) = np.concatenate([X_trn, X_ext]), np.concatenate([y_trn, y_ext])
-
-		y_trn -= 1
-		y_tst -= 1
-
-	X_val = X_trn[-val_len:]
-	y_val = y_trn[-val_len:]
-	X_trn = X_trn[:-val_len]
-	y_trn = y_trn[:-val_len]
 
 	X_avg  = np.mean(X_trn, axis=0, keepdims=True)
 	X_trn -= X_avg
 	X_val -= X_avg
 	X_tst -= X_avg
+
+	if dim > 0:
+
+		pca   = PCA(dim); pca.fit(X_trn.reshape(X_trn.shape[0],-1))
+		X_trn = pca.transform(X_trn.reshape(X_trn.shape[0],-1))[:,:,None,None]
+		X_val = pca.transform(X_val.reshape(X_val.shape[0],-1))[:,:,None,None]
+		X_tst = pca.transform(X_tst.reshape(X_tst.shape[0],-1))[:,:,None,None]
+
+	# Preprocessing Y
+
+	if dataset == 'svhn2': y_trn -= 1; y_val -= 1; y_tst -= 1
+
 	y_trn  = np.squeeze(y_trn)
 	y_val  = np.squeeze(y_val)
 	y_tst  = np.squeeze(y_tst)
@@ -40,18 +54,14 @@ def load(dataset='mnist', padding=True, extra=True):
 
 def augment(dataset='mnist'):
 
-	if   dataset == 'mnist'   : return ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1)
-	elif dataset == 'cifar10' : return ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-	elif dataset == 'cifar100': return ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-	elif dataset == 'svhn2'   : return None
+	if   dataset == 'mnist'  : return ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1)
+	elif dataset == 'cifar10': return ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
+	elif dataset == 'svhn2'  : return ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1)
 	else: raise ValueError(dataset)
 
 if __name__ == '__main__':
 
-	from scipy.io import savemat
-
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load(dataset='mnist', padding=False); savemat('mnist.mat'   , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load(dataset='cifar10'             ); savemat('cifar10.mat' , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load(dataset='cifar100'            ); savemat('cifar100.mat', {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load(dataset='svhn2', extra=False  ); savemat('svhn2.mat'   , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
+	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('mnist'  , 256, False); savemat('mnist.mat'  , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
+	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('cifar10', 256, False); savemat('cifar10.mat', {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
+	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('svhn2'  , 256, False); savemat('svhn2.mat'  , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
 

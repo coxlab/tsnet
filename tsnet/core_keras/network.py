@@ -61,7 +61,7 @@ class NET:
 
 		y_trn = np_utils.to_categorical(y_trn, 10 if settings.dataset != 'cifar100' else 100)
 		y_val = np_utils.to_categorical(y_val, 10 if settings.dataset != 'cifar100' else 100)
-		y_tst = np_utils.to_categorical(y_tst, 10 if settings.dataset != 'cifar100' else 100)
+		y_tst = np_utils.to_categorical(y_tst, 10 if settings.dataset != 'cifar100' else 100) if len(y_tst) > 0 else []
 
 		settings.lrnparam = (settings.lrnparam[:1] + settings.lrnparam[2:])
 
@@ -75,7 +75,7 @@ class NET:
 				self.model.history.history['tst_acc'] += [self.model.evaluate(X_tst, y_tst, batch_size=settings.batchsize, verbose=0)[1]]
 
 		aug = augment(settings.dataset) if settings.augment else None
-		arg = {'nb_epoch':settings.epoch, 'validation_data':(X_val, y_val), 'callbacks':[PerEpochTest()], 'verbose':settings.verbose}
+		arg = {'nb_epoch':settings.epoch, 'validation_data':(X_val, y_val), 'callbacks':[PerEpochTest()] if len(y_tst) > 0 else [], 'verbose':settings.verbose}
 
 		if aug is None: self.model.fit          (         X_trn, y_trn, batch_size=settings.batchsize,                                                               **arg)
 		else          : self.model.fit_generator(aug.flow(X_trn, y_trn, batch_size=settings.batchsize), samples_per_epoch=len(X_trn), nb_worker=4, pickle_safe=True, **arg)
