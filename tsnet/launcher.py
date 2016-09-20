@@ -3,7 +3,7 @@ import argparse; parser = argparse.ArgumentParser()
 
 parser.add_argument('-dataset', default='mnist')
 
-toy = ['conv:1/32', 'relu:1', 'flat:0', 'sfmx:0/10']
+toy = ['conv:2/16', 'relu:2', 'flat:0', 'sfmx:0/10']
 
 parser.add_argument('-network', default=toy, nargs='*')
 parser.add_argument('-load'   , default=''            )

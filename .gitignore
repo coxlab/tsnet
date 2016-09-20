@@ -3,5 +3,6 @@
 *.pyo
 *.pkl
 *.log
+*.mat
 *prof
 !.gitignore
