@@ -37,10 +37,10 @@ def load(dataset='mnist', dim=0, extra=True):
 
 	if dim > 0:
 
-		pca   = PCA(dim); pca.fit(X_trn.reshape(X_trn.shape[0],-1))
-		X_trn = pca.transform(X_trn.reshape(X_trn.shape[0],-1))[:,:,None,None]
-		X_val = pca.transform(X_val.reshape(X_val.shape[0],-1))[:,:,None,None]
-		X_tst = pca.transform(X_tst.reshape(X_tst.shape[0],-1))[:,:,None,None]
+		pc = PCA(dim); pc.fit(X_trn.reshape(X_trn.shape[0],-1))
+		X_trn = pc.transform(X_trn.reshape(X_trn.shape[0],-1))[:,:,None,None]
+		X_val = pc.transform(X_val.reshape(X_val.shape[0],-1))[:,:,None,None]
+		X_tst = pc.transform(X_tst.reshape(X_tst.shape[0],-1))[:,:,None,None]
 
 	# Preprocessing Y
 
