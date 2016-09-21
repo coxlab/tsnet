@@ -1,3 +1,5 @@
+import time
+
 from keras.models import Model
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, Activation, Flatten
 from .layers import DenseTS, ConvolutionTS
@@ -69,7 +71,11 @@ class NET:
 
 		class PerEpochTest(Callback):
 
-			def on_epoch_end(self, epoch, logs={}):
+			def on_epoch_begin(self, epoch, logs={}): self.tic = time.time()
+			def on_epoch_end  (self, epoch, logs={}):
+
+				self.model.history.history['time']  = [] if 'time' not in self.model.history.history else self.model.history.history['time']
+				self.model.history.history['time'] += [time.time() - self.tic]
 
 				self.model.history.history['tst_acc']  = [] if 'tst_acc' not in self.model.history.history else self.model.history.history['tst_acc']
 				self.model.history.history['tst_acc'] += [self.model.evaluate(X_tst, y_tst, batch_size=settings.batchsize, verbose=0)[1]]

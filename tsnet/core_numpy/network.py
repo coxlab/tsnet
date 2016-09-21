@@ -166,12 +166,12 @@ class NET:
 		XT, YT, Xv, Yv, Xt, Yt = dataset
 		settings.lrnparam = [0] + settings.lrnparam # time
 
-		tw, th = (term.width, term.height) if settings.verbose else (80, 24)
+		tw, th = (term.width, term.height) if settings.verbose == 1 else (80, 24)
 		cw, cn = (7, tw / 7)
 		lx, ly = (0, 0)
 
 		def lprint(msg, lx=0, ly=th-1):
-			if settings.verbose:
+			if settings.verbose == 1:
 				with term.location(lx, ly): print(msg, end='')
 
 		## Define Epoch
@@ -193,19 +193,19 @@ class NET:
 					acc  = float(smp - err) / smp
 					rep  = self.backward(Yb).update(settings.lrnalg, settings.lrnparam) if trn else None
 
-					if settings.verbose == 1: lprint(' %6.4f' % acc, lx, ly)
+					lprint(' %6.4f' % acc, lx, ly)
 
 					rem = (time.time() - tic) * (1.0 - prg) / prg
 					rem = str(datetime.timedelta(seconds=int(rem)))
 
-					if settings.verbose == 1: lprint('[%6.2f%% | %s left]' % (prg * 100, rem))
+					lprint('[%6.2f%% | %s left]' % (prg * 100, rem))
 
-			lprint(' %6.4f' % acc, lx, ly)
+			if settings.verbose == 2: print('%6.4f' % acc, end=' ' if ly != (th-2) else '\n')
 			return acc
 
 		## Start
 
-		trn, val, tst = ([] for i in xrange(3))
+		trn, val, tst, tmr = [], [], [], []
 
 		for n in xrange(settings.epoch):
 
@@ -213,9 +213,9 @@ class NET:
 
 			I = np.random.permutation(XT.shape[0]); XT, YT = XT[I], YT[I]
 
-			lx = (n % cn) * cw
+			lx = (n % cn) * cw                            ; tmr += [time.time()]
 			ly = th-4; trn += [process(XT, YT           )]; self.solve()
-			ly = th-3; val += [process(Xv, Yv, trn=False)]
+			ly = th-3; val += [process(Xv, Yv, trn=False)]; tmr += [time.time()]
 			ly = th-2; tst += [process(Xt, Yt, trn=False)]
 
 			self.save(settings.save)
@@ -224,4 +224,4 @@ class NET:
 
 		## Finish
 
-		return {'acc': trn, 'val_acc': val, 'tst_acc': tst}
+		return {'acc': trn, 'val_acc': val, 'tst_acc': tst, 'time': np.subtract(tmr[1::2],tmr[0::2])}
