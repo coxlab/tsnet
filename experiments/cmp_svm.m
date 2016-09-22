@@ -1,3 +1,5 @@
+diary('cmp_svm.log');
+
 system('python tsnet/datasets.py');
 datasets = {'mnist' 'cifar10' 'svhn2'};
 
@@ -12,6 +14,10 @@ for i = 1:length(datasets)
     
     fprintf([datasets{i} '\n']);
     load(datasets{i});
+    
+    X_trn = reshape(X_trn, size(X_trn,1), []);
+    X_val = reshape(X_val, size(X_val,1), []);
+    X_tst = reshape(X_tst, size(X_tst,1), []);
     
     X_trn = bsxfun(@rdivide, X_trn, sqrt(sum(X_trn.^2, 2)));
     X_val = bsxfun(@rdivide, X_val, sqrt(sum(X_val.^2, 2)));
@@ -56,3 +62,5 @@ for i = 1:length(datasets)
         end
     end
 end
+
+diary off;
