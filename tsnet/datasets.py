@@ -42,6 +42,8 @@ def load(dataset='mnist', dim=0, extra=True):
 		X_val = pc.transform(X_val.reshape(X_val.shape[0],-1))[:,:,None,None]
 		X_tst = pc.transform(X_tst.reshape(X_tst.shape[0],-1))[:,:,None,None]
 
+		if __name__ == '__main__': print np.sum(pc.explained_variance_ratio_)
+
 	# Preprocessing Y
 
 	if dataset == 'svhn2': y_trn -= 1; y_val -= 1; y_tst -= 1
