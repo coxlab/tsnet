@@ -1,4 +1,4 @@
-import sys; sys.path.append('./')
+import sys; sys.path.append('.')
 
 import numpy as np
 from itertools import product
@@ -19,7 +19,7 @@ log = open('cmp_cnn.log', 'a')
 for d in D:
 
 	dataset  = load(d)
-	settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -k -v 2' % (100 if d != 'svhn2' else 50)
+	settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -k -v 2' % (100 if d != 'svhn2' else 20)
 
 	for l1, l2, l3, l4, m in product([1,2,3], [1,2,3], [1,2,3], [1,2,3], [0,1]):
 

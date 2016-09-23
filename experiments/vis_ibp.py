@@ -1,4 +1,4 @@
-import sys; sys.path.append('./')
+import sys; sys.path.append('.')
 
 import numpy as np
 from tsnet.launcher import run

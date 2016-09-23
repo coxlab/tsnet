@@ -1,4 +1,4 @@
-import sys; sys.path.append('./')
+import sys; sys.path.append('.')
 
 import numpy as np
 from itertools import product
@@ -7,10 +7,16 @@ from tsnet.datasets import load
 from tsnet.launcher import run
 
 D = ['mnist','cifar10','svhn2']
-L = {0:3, 1:1, 2:1}
+L = [[1,2,3], [1,2,3], [1,2,3], [1]]
 
-def full(m, n): return ['conv:{}/{}'.format(m,n), 'relu:{}'.format(m)]
-def rout(m, k): return ['flat:0', 'rdge:0/{}'.format(k)] if m == 1 else ['flat:0', 'sfmx:0/{}'.format(k)]
+def full(m, n):
+	if   m == 0: return ['conv:0/{}'.format(n), 'relu:0']
+	elif m == 1: return ['conv:1/{}'.format(n), 'relu:1'] + ['flat:0/3', 'conv:0/{}'.format(n)]
+	elif m == 2: return ['conv:2/{}'.format(n), 'relu:2'] + ['flat:0/3', 'conv:0/{}'.format(n)]
+	else       : return ['conv:1/{}'.format(n), 'relu:1']
+
+def rout(m, k): return ['flat:0', 'sfmx:0/{}'.format(k)] if m < 3 else ['flat:0', 'rdge:0/{}'.format(k)]
+def trim(m, N): return N[:-2] if m in [1,2] else N
 
 log = open('cmp_mlp.log', 'a')
 
@@ -18,12 +24,12 @@ for d in D:
 
 	dataset = load(d, 256)
 
-	for m in [0,1,2]:
+	for m in [0,1,2,3]:
 
-		if m == 1: settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -v 1' % 1
-		else     : settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -v 1' % (100 if d != 'svhn2' else 50)
+		if m < 3: settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -v 1' % (100 if d != 'svhn2' else 20)
+		else    : settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -v 1' % 1
 
-		for l in xrange(1, L[m]+1):
+		for l in L[m]:
 
 			par = [str(p) for p in [d, l, m]]
 			par = '-'.join(par)
@@ -31,6 +37,7 @@ for d in D:
 			print par
 
 			net  = full(m, 256) * l
+			net  = trim(m, net)
 			net += rout(m,  10)
 
 			net = ' '.join(net)
