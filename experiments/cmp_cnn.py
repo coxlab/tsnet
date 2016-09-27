@@ -19,7 +19,7 @@ log = open('cmp_cnn.log', 'a')
 for d in D:
 
 	dataset  = load(d)
-	settings = '-d {} -n {} -e %s -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -k -v 2' % (100 if d != 'svhn2' else 20)
+	settings = '-d {} -n {} -e %d -b 128 -lrnalg sgd -lrnparam 1e-3 1e-3 0.9 -k -v 2' % (100 if d != 'svhn2' else 20)
 
 	for l1, l2, l3, l4, m in product([1,2,3], [1,2,3], [1,2,3], [1,2,3], [0,1]):
 
@@ -42,6 +42,7 @@ for d in D:
 		print hst['acc']
 		print hst['val_acc']
 		print hst['tst_acc']
+		# savemat
 
 		log.write(par + ' ')
 		log.write(str(hst['tst_acc'][0                        ]) + ' ' )
