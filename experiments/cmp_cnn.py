@@ -2,6 +2,7 @@ import sys; sys.path.append('.')
 
 import numpy as np
 from itertools import product
+from scipy.io import savemat
 
 from tsnet.datasets import load
 from tsnet.launcher import run
@@ -23,7 +24,7 @@ for d in D:
 
 	for l1, l2, l3, l4, m in product([1,2,3], [1,2,3], [1,2,3], [1,2,3], [0,1]):
 
-		par = [str(p) for p in [d, l1, l2, l3, l4, m]]
+		par = [str(p) for p in [d, m, l1, l2, l3, l4]]
 		par = '-'.join(par)
 
 		print par
@@ -39,10 +40,7 @@ for d in D:
 		net = ' '.join(net)
 		hst = run(settings.format(d, net), dataset)
 
-		print hst['acc']
-		print hst['val_acc']
-		print hst['tst_acc']
-		# savemat
+		savemat(par + '.mat', {'acc':hst['acc'],'val_acc':hst['val_acc'],'tst_acc':hst['tst_acc'],'time':hst['time']})
 
 		log.write(par + ' ')
 		log.write(str(hst['tst_acc'][0                        ]) + ' ' )
