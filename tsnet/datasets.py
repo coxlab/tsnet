@@ -1,4 +1,6 @@
+import os
 import numpy as np
+
 from sklearn.decomposition import PCA
 from keras.preprocessing.image import ImageDataGenerator
 from scipy.io import savemat
@@ -6,6 +8,8 @@ from scipy.io import savemat
 def load(dataset='mnist', dim=0, extra=True):
 
 	# Load Dataset
+
+	if 'FUEL_DATA_PATH' not in os.environ: os.environ['FUEL_DATA_PATH'] = ''
 
 	if   dataset == 'mnist'  : from kerosene.datasets import mnist   as D
 	elif dataset == 'cifar10': from kerosene.datasets import cifar10 as D
