@@ -136,7 +136,8 @@ class NET:
 
 		for L in self.layers:
 
-			if not hasattr(L, 'W'): continue
+			#if not hasattr(L, 'W'): continue
+			if L.__class__.__name__ != 'CONV': continue
 
 			Ws     = np.append(Ws, np.zeros(1, dtype=np.object))
 			Ws[-1] = L.W

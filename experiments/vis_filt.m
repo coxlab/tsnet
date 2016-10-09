@@ -1,8 +1,8 @@
-function vis_filt(fn, iter)
+function vis_filt(fn)
 
 load(fn);
 
-W = Ws{iter*2 - 1};
+W = Ws{end};
 W = permute(W, [3, 4, 2, 1]);
 
 M = max(abs(W),[],1); M = max(M,[],2); M = max(M,[],3);
