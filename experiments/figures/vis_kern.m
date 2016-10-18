@@ -1,5 +1,8 @@
 clear; close all;
 
+%set(0, 'defaultAxesFontName','DejaVu Sans');
+%set(0, 'defaultTextFontName','DejaVu Sans');
+
 ssrelu = @(theta_ss)          (sin(theta_ss)+(pi-theta_ss).*cos(theta_ss))/pi;
 tsrelu = @(theta_ss, theta_ts)(1-theta_ss/pi).*cos(theta_ts);
 
@@ -30,11 +33,13 @@ xlabel('\theta'); set(gca,'XTick',[0 0.5 1]); set(gca,'XTickLabel',{'0','0.5\pi'
 ylabel('\it{k}');
 
 l = {'Linear'};
-l = [l {'SS {\it{l}}=1' 'SS {\it{l}}=2' 'SS {\it{l}}=3'}];
-l = [l {'TS {\it{l}}=1' 'TS {\it{l}}=2' 'TS {\it{l}}=3'}];
+l = [l {'SS {\it{L}}=1' 'SS {\it{L}}=2' 'SS {\it{L}}=3'}];
+l = [l {'TS {\it{L}}=1' 'TS {\it{L}}=2' 'TS {\it{L}}=3'}];
 
-legend(l,'location','southwest');
+h = legend(l,'location','southwest');
+
 set(gcf, 'Position', [0 0 400 300], 'PaperPositionMode', 'auto');
+h.Position(1) = h.Position(1) - 0.01;
+h.Position(2) = h.Position(2) - 0.04;
 
-%print(gcf, '-dpdf', 'vis_kern.pdf');
-%gs -dSAFER -dNOPLATFONTS -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sPAPERSIZE=letter -dCompatibilityLevel=1.4 -dPDFSETTINGS=/printer -dCompatibilityLevel=1.4 -dMaxSubsetPct=100 -dSubsetFonts=true -dEmbedAllFonts=true -sOutputFile=e_vis_kern.pdf -f vis_kern.pdf
+%set(gcf, 'Color', 'none');
