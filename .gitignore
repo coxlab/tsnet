@@ -1,8 +1,5 @@
-.*
 *.pyc
-*.pyo
-*.pkl
 *.log
 *.mat
+*.mex*
 *prof
-!.gitignore

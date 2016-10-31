@@ -1,3 +1,4 @@
+import os
 import sys; sys.path.append('.')
 
 import numpy as np
@@ -23,7 +24,8 @@ log = open('cmp_mlp.log', 'a')
 
 for d in D:
 
-	dataset = load(d, 256)
+	if 'PCADIM' not in os.environ: os.environ['PCADIM'] = '256'
+	dataset = load(d, int(os.environ['PCADIM']))
 
 	for m in [0,1,2,3]:
 

@@ -67,7 +67,9 @@ def augment(dataset='mnist'):
 
 if __name__ == '__main__':
 
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('mnist'  , 256, False); savemat('mnist.mat'  , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('cifar10', 256, False); savemat('cifar10.mat', {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
-	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('svhn2'  , 256, False); savemat('svhn2.mat'  , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
+	if 'PCADIM' not in os.environ: os.environ['PCADIM'] = '0'
+
+	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('mnist'  , int(os.environ['PCADIM']), False); savemat('mnist.mat'  , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
+	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('cifar10', int(os.environ['PCADIM']), False); savemat('cifar10.mat', {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
+	X_trn, y_trn, X_val, y_val, X_tst, y_tst = load('svhn2'  , int(os.environ['PCADIM']), False); savemat('svhn2.mat'  , {'X_trn':X_trn, 'y_trn':y_trn, 'X_val':X_val, 'y_val':y_val, 'X_tst':X_tst, 'y_tst':y_tst})
 

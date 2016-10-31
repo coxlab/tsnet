@@ -1,8 +1,8 @@
-function cmp_svm()
+function cmp_svm(dim)
 
 diary('cmp_svm.log');
 
-%system('python tsnet/datasets.py');
+system(sprintf('PCADIM=%d python tsnet/datasets.py', dim));
 datasets = {'mnist' 'cifar10' 'svhn2'};
 L = 10;
 
